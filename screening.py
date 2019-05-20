@@ -6,11 +6,20 @@ import random
 import time
 from sklearn.model_selection import train_test_split
 
-def compute_loss_gradient(u, mu):
+def compute_truncated_squared_loss_gradient(u, mu):
     g = np.zeros(u.size)
     for i in range(u.size):
         if np.abs(u[i]) > mu:
             g[i] = 2 * (u[i] - np.sign(u[i]) * mu)
+    return g
+
+def compute_hinge_subgradient(u, mu):
+    g = np.zeros(u.size)
+    for i in range(u.size):
+        if u[i] < mu:
+            g[i] = -1
+        elif u[i] = mu:
+            g[i] = np.random.rand(1)[0] - 1
     return g
 
 def compute_l1_subgradient(u):
@@ -22,15 +31,24 @@ def compute_l1_subgradient(u):
             g[i] = 2 * np.random.rand(1)[0] - 1
     return g
 
-def compute_subgradient(x, D, y, lmbda, mu, penalty):
-    output = D.dot(x) - y
-    g_1 = compute_loss_gradient(output, mu)
-    #g_1 = np.transpose(D).dot(g_1)
-    g_1 = (1 / (2 * D.shape[0])) * np.transpose(D).dot(g_1)
+def compute_subgradient(x, D, y, lmbda, mu, loss, penalty, intercept):
+    if loss == 'truncated_squared':
+        output = D.dot(x) - y
+        g_1 = compute_truncated_squared_loss_gradient(output, mu)
+        g_1 = (1 / (2 * D.shape[0])) * np.transpose(D).dot(g_1)
+    elif loss == 'hinge':
+        data = np.diag(y).dot(D)
+        output = data.dot(x)
+        g_1 = compute_hinge_subgradient(output, mu)
+        g_1 = (1 / D.shape[0]) * np.transpose(data).dot(g_1)
     if penalty == 'l2':
         g_2 = 2 * x
+        if intercept:
+            g_2[D.shape[1]-1] = 0
     elif penalty == 'l1':   
         g_2 = compute_l1_subgradient(x)
+        if intercept:
+            g_2[D.shape[1]-1] = 0
     g = g_1 + lmbda * g_2
     return g
 
@@ -41,7 +59,11 @@ def compute_A_g(scaling, L, I_k_vec, g):
     A_g = scaling * g - L.dot(I_k_L)
     return A_g
 
-def iterate_ellipsoids_accelerated_(D, y, z_init, r_init, lmbda, mu, penalty, n_steps):
+def iterate_ellipsoids_accelerated_(D, y, z_init, r_init, lmbda, mu, loss, penalty, n_steps, intercept):
+    if intercept:
+        X = np.concatenate((D, np.ones(D.shape[0]).reshape(1,-1).T), axis=1)
+    else:
+        X = D
     start = time.time()
     k = 0
     z = z_init
@@ -51,7 +73,7 @@ def iterate_ellipsoids_accelerated_(D, y, z_init, r_init, lmbda, mu, penalty, n_
     I = np.diag(scaling * np.ones(p))
      
     while k < n_steps:
-        g = compute_subgradient(z, D, y, lmbda, mu, penalty)
+        g = compute_subgradient(z, X, y, lmbda, mu, loss, penalty, intercept)
         if k == 0:
             A_g = r_init * g
             den = np.sqrt(g.dot(A_g))
@@ -88,31 +110,59 @@ def compute_test_with_linear_ineq_accelerated(D_i, y_i, z, scaling, L, I_k_vec, 
         test = D_i.dot(z) + body - y_i
     return test
 
-def test_dataset_accelerated(D, y, lmbda, mu, penalty, n_steps):
-    z_init = np.zeros(D.shape[1])
-    r_init = np.sqrt(D.shape[1])
-    z, scaling, L, I_k_vec = iterate_ellipsoids_accelerated_(D, y, z_init, r_init, lmbda, mu, 
-        penalty, n_steps)
-    results = np.zeros(D.shape[0])
-    g = compute_subgradient(z, D, y, lmbda, mu, penalty)
+def test_dataset_accelerated(D, y, lmbda, mu, classification, loss, penalty, n_steps, intercept):
+    if intercept:
+        X = np.concatenate((D, np.ones(D.shape[0]).reshape(1,-1).T), axis=1)
+        z_init = np.zeros(X.shape[1] + 1)
+        r_init = np.sqrt(X.shape[1] + 1)
+    else:
+        X = D
+        z_init = np.zeros(X.shape[1])
+        r_init = np.sqrt(X.shape[1])
+    z, scaling, L, I_k_vec = iterate_ellipsoids_accelerated_(X, y, z_init, r_init, lmbda, mu, 
+        loss, penalty, n_steps, intercept)
+    results = np.zeros(X.shape[0])
+    g = compute_subgradient(z, X, y, lmbda, mu, loss, penalty, intercept)
     start = time.time()
-    for i in range(D.shape[0]):
-        test_1 = compute_test_with_linear_ineq_accelerated(D[i], y[i], z, scaling, L, I_k_vec, g)
-        test_2 = compute_test_with_linear_ineq_accelerated(-D[i],-y[i],z,scaling, L, I_k_vec, g)
-        if test_1 < mu and test_2 < mu:
-            results[i] = 1
+    if classification:
+        X_ = np.diag(y).dot(X)
+        y_ = np.zeros(len(y))
+        for i in range(X.shape[0]):
+            test = compute_test_with_linear_ineq_accelerated(X_[i],y_[i], z, scaling, L, I_k_vec, g)
+            if test < mu:
+                results[i] = 1
+    else:
+        for i in range(X.shape[0]):
+            test_1 = compute_test_with_linear_ineq_accelerated(X[i], y[i], z, scaling, L, I_k_vec, g)
+            test_2 = compute_test_with_linear_ineq_accelerated(-X[i],-y[i],z,scaling, L, I_k_vec, g)
+            if test_1 < mu and test_2 < mu:
+                results[i] = 1
     end = time.time()
     print('Time to test the entire dataset:', end - start)
     return results
 
-def rank_dataset_accelerated(D, y, z, scaling, L, I_k_vec, lmbda, mu, penalty):
-    scores = np.zeros(D.shape[0])
-    g = compute_subgradient(z, D, y, lmbda, mu, penalty)
+def rank_dataset_accelerated(D, y, z, scaling, L, I_k_vec, lmbda, mu, classification, 
+    loss, penalty, intercept):
+    if intercept:
+        X = np.concatenate((D, np.ones(D.shape[0]).reshape(1,-1).T), axis=1)
+    else:
+        X = D
+    scores = np.zeros(X.shape[0])
+    g = compute_subgradient(z, X, y, lmbda, mu, loss, penalty, intercept)
     start = time.time()
-    for i in range(D.shape[0]):
-        test_1 = compute_test_with_linear_ineq_accelerated(D[i], y[i], z, scaling, L, I_k_vec, g)
-        test_2 = compute_test_with_linear_ineq_accelerated(-D[i],-y[i],z,scaling, L, I_k_vec, g)
-        scores[i] = np.maximum(test_1, test_2)
+    if classification:
+        X_ = np.diag(y).dot(X)
+        y_ = np.zeros(len(y))
+        for i in range(X.shape[0]):
+            scores[i] = compute_test_with_linear_ineq_accelerated(X_[i],y_[i], z, scaling, L,
+             I_k_vec, g, classification)
+    else:
+        for i in range(X.shape[0]):
+            test_1 = compute_test_with_linear_ineq_accelerated(X[i], y[i], z, scaling, L, I_k_vec, g,
+             classification)
+            test_2 = compute_test_with_linear_ineq_accelerated(-X[i], -y[i], z, scaling, L, I_k_vec, g,
+                classification)
+            scores[i] = np.maximum(test_1, test_2)
     end = time.time()
     print('Time to rank the entire dataset:', end - start)
     return scores

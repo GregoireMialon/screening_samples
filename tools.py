@@ -108,9 +108,9 @@ def plot_experiment(data, title, dataset, dataset_size):
     scores_screened_mean = np.mean(scores_screened_all, 0)
     scores_r_mean = np.mean(scores_r_all, 0)
 
-    scores_regular_var = np.var(scores_regular_all, 0)
-    scores_screened_var = np.var(scores_screened_all, 0)
-    scores_r_var = np.var(scores_r_all, 0)
+    scores_regular_var = np.sqrt(np.var(scores_regular_all, 0))
+    scores_screened_var = np.sqrt(np.var(scores_screened_all, 0))
+    scores_r_var = np.sqrt(np.var(scores_r_all, 0))
 
     fig, ax1 = plt.subplots()
     ax1.errorbar(nb_to_del_table, scores_regular_mean, yerr=scores_regular_var, label='Whole dataset')

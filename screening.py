@@ -18,7 +18,7 @@ def compute_hinge_subgradient(u, mu):
     for i in range(u.size):
         if u[i] < mu:
             g[i] = -1
-        elif u[i] = mu:
+        elif u[i] == mu:
             g[i] = np.random.rand(1)[0] - 1
     return g
 
@@ -96,18 +96,29 @@ def iterate_ellipsoids_accelerated_(D, y, z_init, r_init, lmbda, mu, loss, penal
     print('Time to compute z and A:', end - start)
     return z, scaling, L, I_k_vec
 
-def compute_test_with_linear_ineq_accelerated(D_i, y_i, z, scaling, L, I_k_vec, g):
+def compute_test_with_linear_ineq_accelerated(D_i, y_i, z, scaling, L, I_k_vec, g, classification):
     A_g = compute_A_g(scaling, L, I_k_vec, g)
     A_D_i = compute_A_g(scaling, L, I_k_vec, D_i)
-    nu = g.dot(A_D_i) / g.dot(A_g)
-    if nu < 0:
-        test = D_i.dot(z) + np.sqrt(D_i.dot(A_D_i)) - y_i
+    if classification:
+        nu = - g.dot(A_D_i) / g.dot(A_g)
+        if nu < 0:
+            test = D_i.dot(z) - np.sqrt(D_i.dot(A_D_i))
+        else:
+            new_D_i = D_i + nu * g
+            A_new_D_i = compute_A_g(scaling, L, I_k_vec, new_D_i)
+            mu = np.sqrt(new_D_i.dot(A_new_D_i)) / 2
+            body = D_i.dot(A_new_D_i) / (2 * mu)
+            test = D_i.dot(z) - body
     else:
-        new_D_i = D_i - nu * g
-        A_new_D_i = compute_A_g(scaling, L, I_k_vec, new_D_i)
-        mu = np.sqrt(new_D_i.dot(A_new_D_i)) / 2
-        body = D_i.dot(A_new_D_i) / (2 * mu)
-        test = D_i.dot(z) + body - y_i
+        nu = g.dot(A_D_i) / g.dot(A_g)
+        if nu < 0:
+            test = D_i.dot(z) + np.sqrt(D_i.dot(A_D_i)) - y_i
+        else:
+            new_D_i = D_i - nu * g
+            A_new_D_i = compute_A_g(scaling, L, I_k_vec, new_D_i)
+            mu = np.sqrt(new_D_i.dot(A_new_D_i)) / 2
+            body = D_i.dot(A_new_D_i) / (2 * mu)
+            test = D_i.dot(z) + body - y_i
     return test
 
 def test_dataset_accelerated(D, y, lmbda, mu, classification, loss, penalty, n_steps, intercept):
@@ -152,9 +163,8 @@ def rank_dataset_accelerated(D, y, z, scaling, L, I_k_vec, lmbda, mu, classifica
     start = time.time()
     if classification:
         X_ = np.diag(y).dot(X)
-        y_ = np.zeros(len(y))
         for i in range(X.shape[0]):
-            scores[i] = compute_test_with_linear_ineq_accelerated(X_[i],y_[i], z, scaling, L,
+            scores[i] = compute_test_with_linear_ineq_accelerated(X_[i], None, z, scaling, L,
              I_k_vec, g, classification)
     else:
         for i in range(X.shape[0]):

@@ -6,8 +6,9 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from tools import *
 from screening import *
-from sklearn.datasets import load_diabetes, load_boston
+from sklearn.datasets import load_diabetes, load_boston, fetch_20newsgroups
 from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.svm import LinearSVC
 import random
 
 def load_leukemia(cluster):
@@ -33,11 +34,11 @@ def load_20newsgroups():
     y = 2 * y - np.ones(len(y))
     return X, y
 
-def experiment(dataset, nb_delete_steps, lmbda, mu, penalty, intercept, classification,
+def experiment(dataset, nb_delete_steps, lmbda, mu, classification, loss, penalty, intercept, classif_score,
                     n_ellipsoid_steps, nb_exp, nb_test, cluster):
 
-    exp_title = '/lmbda_{}_n_ellipsoid_{}_intercept_{}_mu_{}_classification_{}_penalty_{}'.format(lmbda, n_ellipsoid_steps, 
-        intercept, mu, classification, penalty)
+    exp_title = '/lmbda_{}_n_ellipsoid_{}_intercept_{}_mu_{}_classif_score_{}_loss_{}_penalty_{}'.format(lmbda, n_ellipsoid_steps, 
+        intercept, mu, classif_score, loss, penalty)
 
     if dataset == 'leukemia':
         X, y = load_leukemia(cluster)
@@ -51,9 +52,10 @@ def experiment(dataset, nb_delete_steps, lmbda, mu, penalty, intercept, classifi
         y = diabetes[1]
     elif dataset == '20newsgroups':
         X, y = load_20newsgroups()
-
-    #if not(intercept):
-        #X = np.concatenate((X, np.ones(X.shape[0]).reshape(1,-1).T), axis=1)
+    else:
+        X = dataset[0]
+        y = dataset[1]
+        dataset = 'synthetic'
 
     scores_regular_all = []
     scores_screened_all = []
@@ -74,16 +76,16 @@ def experiment(dataset, nb_delete_steps, lmbda, mu, penalty, intercept, classifi
             z_init = np.zeros(X_train.shape[1])
             r_init = np.sqrt(X_train.shape[1])
         z, scaling, L, I_k_vec = iterate_ellipsoids_accelerated_(X_train, y_train, z_init,
-                                r_init, lmbda, mu, penalty, n_ellipsoid_steps, intercept)
+                                r_init, lmbda, mu, loss, penalty, n_ellipsoid_steps, intercept)
         scores = rank_dataset_accelerated(X_train, y_train, z, scaling, L, I_k_vec,
-                                             lmbda, mu, penalty, intercept)
+                                             lmbda, mu, classification, loss, penalty, intercept)
         idx_not_safe = get_idx_not_safe(scores, mu)
         idx_not_safe_all += idx_not_safe
         scores_regular = []
         scores_screened = []
         scores_r= []
         
-        nb_to_del_table = np.linspace(1, X_train.shape[0] - 10, nb_delete_steps, dtype='int')
+        nb_to_del_table = np.linspace(1, X_train.shape[0] - 40, nb_delete_steps, dtype='int')
 
         X_r = X_train
         y_r = y_train
@@ -98,22 +100,28 @@ def experiment(dataset, nb_delete_steps, lmbda, mu, penalty, intercept, classifi
             print(X_train.shape, X_screened.shape, X_r.shape)
             while compt < nb_test:
                 compt += 1
-                lasso_regular = Lasso(alpha=lmbda, fit_intercept=intercept, 
-                    max_iter=10000).fit(X_train,y_train)
-                lasso_screened = Lasso(alpha=lmbda, fit_intercept=intercept, 
-                    max_iter=10000).fit(X_screened, y_screened)
-                lasso_r = Lasso(alpha=lmbda,fit_intercept=intercept, 
-                    max_iter=10000).fit(X_r, y_r)
-
-                if classification:
-                    score_regular += scoring_classif(lasso_regular, X_test, y_test)
-                    score_screened += scoring_classif(lasso_screened, X_test, y_test)
-                    score_r += scoring_classif(lasso_r, X_test, y_test)
+                if loss == 'truncated_squared' and penalty == 'l1':
+                    estimator_regular = Lasso(alpha=lmbda, fit_intercept=intercept, 
+                        max_iter=10000).fit(X_train,y_train)
+                    estimator_screened = Lasso(alpha=lmbda, fit_intercept=intercept, 
+                        max_iter=10000).fit(X_screened, y_screened)
+                    estimator_r = Lasso(alpha=lmbda,fit_intercept=intercept, 
+                        max_iter=10000).fit(X_r, y_r)
+                elif loss == 'hinge' and penalty == 'l2':
+                    estimator_regular = LinearSVC(C= 1 / lmbda, loss=loss, penalty=penalty, fit_intercept=intercept, 
+                        max_iter=10000).fit(X_train,y_train)
+                    estimator_screened = LinearSVC(C= 1 / lmbda, loss=loss, penalty=penalty, fit_intercept=intercept, 
+                        max_iter=10000).fit(X_screened, y_screened)
+                    estimator_r = LinearSVC(C= 1 / lmbda, loss=loss, penalty=penalty, fit_intercept=intercept, 
+                        max_iter=10000).fit(X_r, y_r)
+                if classif_score:
+                    score_regular += scoring_classif(estimator_regular, X_test, y_test)
+                    score_screened += scoring_classif(estimator_screened, X_test, y_test)
+                    score_r += scoring_classif(estimator_r, X_test, y_test)
                 else:
-                    score_regular += lasso_regular.score(X_test, y_test)
-                    score_screened += lasso_screened.score(X_test, y_test)
-                    score_r += lasso_r.score(X_test, y_test)
-            
+                    score_regular += estimator_regular.score(X_test, y_test)
+                    score_screened += estimator_screened.score(X_test, y_test)
+                    score_r += estimator_r.score(X_test, y_test)
             scores_regular.append(score_regular / nb_test)
             scores_screened.append(score_screened / nb_test)
             scores_r.append(score_r / nb_test)
@@ -139,15 +147,18 @@ if __name__ == '__main__':
     parser.add_argument('--nb_delete_steps', default=20, type=int)
     parser.add_argument('--lmbda', default=0.01, type=float)
     parser.add_argument('--mu', default=1, type=float)
+    parser.add_argument('--classification', action='store_true')
+    parser.add_argument('--loss', default='truncated_squared')
     parser.add_argument('--penalty', default='l1', help='determines the penalty in the loss of the problem to screen')
     parser.add_argument('--intercept', action='store_true', help=
                             'if not intercept, a dimension is added to the dataset')
-    parser.add_argument('--classification', action='store_true', help='determines the score that is used')
+    parser.add_argument('--classif_score', action='store_true', help='determines the score that is used')
     parser.add_argument('--n_ellipsoid_steps', default=100, type=int)
     parser.add_argument('--nb_exp', default=5, type=int)
     parser.add_argument('--nb_test', default=3, type=int)
     parser.add_argument('--cluster', action='store_true', help='save on data1')
     args = parser.parse_args()
 
-    experiment(args.dataset, args.nb_delete_steps, args.lmbda, args.mu, args.penalty, args.intercept, 
-        args.classification, args.n_ellipsoid_steps, args.nb_exp, args.nb_test, args.cluster)
+    experiment(args.dataset, args.nb_delete_steps, args.lmbda, args.mu, args.classification, 
+        args.loss, args.penalty, args.intercept, args.classif_score, args.n_ellipsoid_steps, 
+        args.nb_exp, args.nb_test, args.cluster)

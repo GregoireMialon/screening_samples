@@ -1,15 +1,13 @@
 from sklearn.linear_model import Lasso
+from sklearn.svm import LinearSVC
 from sklearn.model_selection import GridSearchCV
 from random import randint
+import random
 import numpy as np
 from scipy.sparse import rand
 import matplotlib.pyplot as plt
 
-def make_data(param_set, noise=True):
-
-    n = param_set[0]
-    p = param_set[1]
-    sparsity = param_set[2]
+def make_data(n, p, sparsity, noise=True):
     X = np.zeros((n,p))
     y = np.zeros(n)
     true_params = rand(p, 1, density = sparsity).A.ravel()
@@ -34,27 +32,89 @@ def make_data(param_set, noise=True):
 
     return X, y, true_params, np.sqrt(noise_norm)
 
-def make_redundant_data(X, y, nb_points_to_add):
+def make_redundant_data(X, y, nb_points_to_add, noise=0):
     X_redundant = X
     y_redundant = y
     compt = 0
     while compt< nb_points_to_add:
-        #generate random convex combination
-        #multiple ways to do
-        # add it to X_r, y_r
-        X_r = np.concatenate((X_r, X_r_new), axis=0)
-        y_r = np.append(y_r, y_r_new)
+        compt+=1
+        random.seed(compt)
+        np.random.seed(compt)
+        convex_comb = np.random.random(X.shape[0])
+        convex_comb /= convex_comb.sum()
+        X_redundant_new = (X.T).dot(convex_comb).reshape(-1, X.shape[1])
+        y_redundant_new = y.dot(convex_comb)
+        if noise != 0:
+            y_redundant_new += np.random.randn(1) * noise
+        X_redundant = np.concatenate((X_redundant, X_redundant_new), axis=0)
+        y_redundant = np.append(y_redundant, y_redundant_new)
+    return X_redundant, y_redundant
+
+def make_redundant_data_classification(X, y, nb_points_to_add):
+    X_redundant = X
+    y_redundant = y
+    compt = 0
+    X_pos = X[np.where(y == 1)]
+    X_neg = X[np.where(y == 1)]
+
+    while compt < nb_points_to_add:
+        compt+=1
+        random.seed(compt)
+        np.random.seed(compt)
+
+        convex_comb = np.random.random(X_pos.shape[0])
+        convex_comb /= convex_comb.sum()
+        X_redundant_new = (X_pos.T).dot(convex_comb).reshape(-1, X.shape[1])
+        X_redundant = np.concatenate((X_redundant, X_redundant_new), axis=0)
+        y_redundant = np.append(y_redundant, 1)
+
+        convex_comb = np.random.random(X_neg.shape[0])
+        convex_comb /= convex_comb.sum()
+        X_redundant_new = (X_neg.T).dot(convex_comb).reshape(-1, X.shape[1])
+        X_redundant = np.concatenate((X_redundant, X_redundant_new), axis=0)
+        y_redundant = np.append(y_redundant, -1)
 
     return X_redundant, y_redundant
 
-def find_best_lasso(X, y, intercept=True):
-    alpha = {'alpha':[0.001,0.01,0.1,1,10]}
-    clf = GridSearchCV(estimator = Lasso(fit_intercept=intercept, 
-                                                                 max_iter=10000),
-                                               param_grid = alpha)
+def balanced_subsample(x,y,subsample_size=1):
+    class_xs = []
+    min_elems = None
+    for yi in np.unique(y):
+        elems = x[(y == yi)]
+        class_xs.append((yi, elems))
+        if min_elems == None or elems.shape[0] < min_elems:
+            min_elems = elems.shape[0]
+    use_elems = min_elems
+    if subsample_size < 1:
+        use_elems = int(min_elems*subsample_size)
+    xs = []
+    ys = []
+    for ci,this_xs in class_xs:
+        if len(this_xs) > use_elems:
+            np.random.shuffle(this_xs)
+        x_ = this_xs[:use_elems]
+        y_ = np.empty(use_elems)
+        y_.fill(ci)
+        xs.append(x_)
+        ys.append(y_)
+    xs = np.concatenate(xs)
+    ys = np.concatenate(ys)
+    return xs,ys
+
+
+def find_best_lasso(X, y):
+    param_grid = {'alpha':[0.001,0.01,0.1,1,10], 'fit_intercept':[True, False] }
+    clf = GridSearchCV(estimator = Lasso(max_iter=10000), param_grid = param_grid)
     clf.fit(X,y)
     best_lasso = clf.best_estimator_
     return best_lasso, clf.best_score_
+
+def find_best_svm(X, y):
+    param_grid = {'C':[0.1, 1, 10, 100, 1000], 'fit_intercept':[True, False] }
+    clf = GridSearchCV(estimator = LinearSVC(max_iter=10000), param_grid = param_grid)
+    clf.fit(X,y)
+    best_svm = clf.best_estimator_
+    return best_svm, clf.best_score_
 
 def random_screening(X, y, nb_points_to_keep):
     X_screened = X
@@ -64,6 +124,10 @@ def random_screening(X, y, nb_points_to_keep):
         X_screened = np.delete(X_screened, i, 0)
         y_screened = np.delete(y_screened, i, 0)
     return X_screened, y_screened
+
+def k_medioids(X, y, nb_points_to_keep):
+    print('TODO')
+    return
 
 def screen(X, y, scores, nb_to_delete):
     X_screened = X

@@ -4,11 +4,11 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from tools import (
     make_data, make_redundant_data, make_redundant_data_classification, 
-    balanced_subsample, random_screening, check_dataset, screen, get_idx_not_safe, 
+    balanced_subsample, random_screening, dataset_has_both_labels, screen, get_idx_not_safe, 
     scoring_classif, plot_experiment
 )
 from screening import (
-    iterate_ellipsoids_accelerated_,
+    iterate_ellipsoids_accelerated,
     rank_dataset_accelerated
 )
 from sklearn.datasets import load_diabetes, load_boston, fetch_20newsgroups
@@ -44,13 +44,15 @@ def load_20newsgroups():
 def load_mnist(path, pb=1):
     mat = scipy.io.loadmat(path + 'ckn_mnist.mat')
     X = mat['psiTr'].T
-    print(X.shape)
+    print('Shape of original MNIST', X.shape)
     y = mat['Ytr']
     y = np.array(y, dtype=int).reshape(y.shape[0])
     for i in range(len(y)):
         if y[i] != 9:
             y[i] = - 1
-    X, y = balanced_subsample(X, y)
+        else:
+            y[i] = 1
+    #X, y = balanced_subsample(X, y)
     return X, y
 
 def load_higgs(path):
@@ -124,14 +126,14 @@ def experiment_get_ellipsoid(X, y, intercept, better_init, better_radius, loss, 
                 z_init = np.append(z_init, est.intercept_)
     if better_radius != 0:
         r_init = float(better_radius)                            
-    z, scaling, L, I_k_vec, g = iterate_ellipsoids_accelerated_(X, y, z_init,
+    z, scaling, L, I_k_vec, g = iterate_ellipsoids_accelerated(X, y, z_init,
                                 r_init, lmbda, mu, loss, penalty, n_ellipsoid_steps, intercept)
     return z, scaling, L, I_k_vec, g
 
 #@profile
 def experiment(path, dataset, size, redundant, noise, nb_delete_steps, lmbda, mu, classification, 
                 loss, penalty, intercept, classif_score, n_ellipsoid_steps, better_init, 
-                better_radius, cut, get_ell_from_subset, nb_exp, nb_test, plot, zoom):  
+                better_radius, cut, get_ell_from_subset, clip_ell, nb_exp, nb_test, plot, zoom):  
     exp_title = 'X_size_{}_sub_ell_{}_lmbda_{}_n_ellipsoid_{}_intercept_{}_mu_{}_redundant_{}_noise_{}_better_init_{}_better_radius_{}'.format(size, 
         get_ell_from_subset, lmbda, n_ellipsoid_steps, intercept, mu, redundant, noise, better_init, 
         better_radius)
@@ -144,6 +146,12 @@ def experiment(path, dataset, size, redundant, noise, nb_delete_steps, lmbda, mu
 
     compt_exp = 0
     idx_not_safe_all = 0
+    
+    #TODO: doublon avec les conditions dans experiment_get_ellipsoid
+    if better_radius != 0:
+        r_init = float(better_radius) 
+    else:
+        r_init = X.shape[1]
 
     while compt_exp < nb_exp:
         random.seed(compt_exp)
@@ -153,8 +161,9 @@ def experiment(path, dataset, size, redundant, noise, nb_delete_steps, lmbda, mu
         if get_ell_from_subset != 0:
             X_train_, y_train_ = balanced_subsample(X_train, y_train)
             X_train_, y_train_ = shuffle(X_train_, y_train_)
-            X_train_ = X_train_[:get_ell_from_subset]
-            y_train_ = y_train_[:get_ell_from_subset]
+            if get_ell_from_subset < X_train_.shape[0]:
+                X_train_ = X_train_[:get_ell_from_subset]
+                y_train_ = y_train_[:get_ell_from_subset]
             z, scaling, L, I_k_vec, g = experiment_get_ellipsoid(X_train_, y_train_, intercept, better_init, 
                                                             better_radius, loss, penalty, lmbda, 
                                                             classification, mu, n_ellipsoid_steps)
@@ -162,8 +171,10 @@ def experiment(path, dataset, size, redundant, noise, nb_delete_steps, lmbda, mu
             z, scaling, L, I_k_vec, g = experiment_get_ellipsoid(X_train, y_train, intercept, better_init, 
                                                             better_radius, loss, penalty, lmbda, 
                                                             classification, mu, n_ellipsoid_steps)
+                                                            
         scores = rank_dataset_accelerated(X_train, y_train, z, scaling, L, I_k_vec, g,
-                                             lmbda, mu, classification, loss, penalty, intercept, cut)
+                                             lmbda, mu, classification, loss, penalty, intercept, cut, 
+                                             clip_ell, r_init)
         idx_not_safe = get_idx_not_safe(scores, mu)
         idx_not_safe_all += idx_not_safe
         scores_regular = []
@@ -182,7 +193,7 @@ def experiment(path, dataset, size, redundant, noise, nb_delete_steps, lmbda, mu
             compt = 0
             X_screened, y_screened = screen(X_train, y_train, scores, nb_to_delete)
             X_r, y_r = random_screening(X_r, y_r, X_train.shape[0] - nb_to_delete)
-            if not(check_dataset(y_r) and check_dataset(y_screened)):
+            if not(dataset_has_both_labels(y_r) and dataset_has_both_labels(y_screened)):
                 break
             print(X_train.shape, X_screened.shape, X_r.shape)
             while compt < nb_test:
@@ -244,11 +255,11 @@ if __name__ == '__main__':
     parser.add_argument('--better_radius', default=10, type=float, help='radius of the initial l2 ball')
     parser.add_argument('--cut', action='store_true', help='cut the final ellipsoid in half using a subgradient of the loss')
     parser.add_argument('--get_ell_from_subset', default=0, type=int, help='train the ellipsoid on a random subset of the dataset')
+    parser.add_argument('--clip_ell', action='store_true')
     parser.add_argument('--nb_exp', default=10, type=int)
     parser.add_argument('--nb_test', default=3, type=int)
     parser.add_argument('--plot', action='store_true')
     parser.add_argument('--zoom', default=[0.2, 0.6], nargs='+', type=float, help='zoom in the final plot')
-    
     args = parser.parse_args()
 
     print('START')
@@ -257,4 +268,4 @@ if __name__ == '__main__':
         args.lmbda, args.mu, 
         args.classification, args.loss, args.penalty, args.intercept, args.classif_score, 
         args.n_ellipsoid_steps, args.better_init, args.better_radius, args.cut, 
-        args.get_ell_from_subset, args.nb_exp, args.nb_test, args.plot, args.zoom)
+        args.get_ell_from_subset, args.clip_ell, args.nb_exp, args.nb_test, args.plot, args.zoom)

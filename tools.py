@@ -5,6 +5,8 @@ from random import randint
 import random
 import numpy as np
 from scipy.sparse import rand
+from scipy.special import gamma
+from sklearn.utils import shuffle
 import matplotlib.pyplot as plt
 
 
@@ -103,6 +105,7 @@ def balanced_subsample(x,y,subsample_size=1):
         ys.append(y_)
     xs = np.concatenate(xs)
     ys = np.concatenate(ys)
+    xs, ys = shuffle(xs, ys)
     return xs,ys
 
 
@@ -123,6 +126,13 @@ def find_best_svm(X, y):
     return best_svm, clf.best_score_
 
 
+def compute_ellipsoid_volume(radius):
+    dim = len(radius)
+    num = 2 * (np.pi ** (dim / 2)) * np.prod(radius)
+    den = dim * gamma(dim / 2)
+    return num / den
+
+
 def random_screening(X, y, nb_points_to_keep):
     X_screened = X
     y_screened = y
@@ -138,12 +148,12 @@ def k_medioids(X, y, nb_points_to_keep):
     return
 
 
-def check_dataset(y):
-    is_balanced=True
+def dataset_has_both_labels(y):
+    has_both_labels=True
     nb_labels = len(np.unique(y))
     if nb_labels < 2:
-        is_balanced=False
-    return is_balanced
+        has_both_labels=False
+    return has_both_labels
 
 
 def cut_list(my_list):
@@ -188,10 +198,11 @@ def scoring_interval_regression(y, y_predict, y_predict_screened, mu):
                 score_screened += 1
     return score_screened / score
 
-    
-def plot_experiment(data, zoom=None, name=None, save=False):
 
-    train_set_size = data[5]
+def plot_experiment(data, train_set_size=None, zoom=None, name=None, save=False):
+
+    if len(data) == 6:
+        train_set_size = data[5]
     nb_to_del_table = data[0] / train_set_size
     scores_regular_all = np.array(cut_list(data[1]))
     scores_screened_all = np.array(cut_list(data[2]))

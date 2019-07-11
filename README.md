@@ -3,7 +3,7 @@
 ## INSTALLATION
 
 
-### Install plasp
+### Interval Regression : Install plasp
 
 `git clone https://github.com/VivienCabannes/plasp`
 

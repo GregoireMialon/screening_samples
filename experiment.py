@@ -107,7 +107,7 @@ def fit_estimator(X, y, loss, penalty, lmbda, intercept, max_iter=10000):
     return estimator
 
 def experiment_get_ellipsoid(X, y, intercept, better_init, better_radius, loss, penalty, 
-                                lmbda, classification, mu, n_ellipsoid_steps):
+                                lmbda, classification, mu, n_ellipsoid_steps, clip_ell):
     if intercept:
         z_init = np.zeros(X.shape[1] + 1)
         r_init = X.shape[1] + 1
@@ -128,6 +128,8 @@ def experiment_get_ellipsoid(X, y, intercept, better_init, better_radius, loss, 
         r_init = float(better_radius)                            
     z, scaling, L, I_k_vec, g = iterate_ellipsoids_accelerated(X, y, z_init,
                                 r_init, lmbda, mu, loss, penalty, n_ellipsoid_steps, intercept)
+    if clip_ell:
+            scaling = r_init
     return z, scaling, L, I_k_vec, g
 
 #@profile
@@ -147,12 +149,6 @@ def experiment(path, dataset, size, redundant, noise, nb_delete_steps, lmbda, mu
     compt_exp = 0
     idx_not_safe_all = 0
     
-    #TODO: doublon avec les conditions dans experiment_get_ellipsoid
-    if better_radius != 0:
-        r_init = float(better_radius) 
-    else:
-        r_init = X.shape[1]
-
     while compt_exp < nb_exp:
         random.seed(compt_exp)
         np.random.seed(compt_exp)
@@ -166,15 +162,14 @@ def experiment(path, dataset, size, redundant, noise, nb_delete_steps, lmbda, mu
                 y_train_ = y_train_[:get_ell_from_subset]
             z, scaling, L, I_k_vec, g = experiment_get_ellipsoid(X_train_, y_train_, intercept, better_init, 
                                                             better_radius, loss, penalty, lmbda, 
-                                                            classification, mu, n_ellipsoid_steps)
+                                                            classification, mu, n_ellipsoid_steps, clip_ell)
         else:
             z, scaling, L, I_k_vec, g = experiment_get_ellipsoid(X_train, y_train, intercept, better_init, 
                                                             better_radius, loss, penalty, lmbda, 
-                                                            classification, mu, n_ellipsoid_steps)
-                                                            
+                                                            classification, mu, n_ellipsoid_steps, clip_ell)
+                                                        
         scores = rank_dataset_accelerated(X_train, y_train, z, scaling, L, I_k_vec, g,
-                                             lmbda, mu, classification, loss, penalty, intercept, cut, 
-                                             clip_ell, r_init)
+                                             lmbda, mu, classification, loss, penalty, intercept, cut)
         idx_not_safe = get_idx_not_safe(scores, mu)
         idx_not_safe_all += idx_not_safe
         scores_regular = []
@@ -235,7 +230,6 @@ def experiment(path, dataset, size, redundant, noise, nb_delete_steps, lmbda, mu
     return
 
 if __name__ == '__main__':
-
     parser = argparse.ArgumentParser()
     parser.add_argument('--path', default='./', type=str)
     parser.add_argument('--dataset', default='diabetes', help='dataset used for the experiment')

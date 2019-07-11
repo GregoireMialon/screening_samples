@@ -57,17 +57,10 @@ def compute_subgradient(x, D, y, lmbda, mu, loss, penalty, intercept):
     return g
 
 
-def compute_A_g(scaling, L, I_k_vec, g, clip_ell, init_radius):
-    if clip_ell:
-        A = scaling * np.identity(len(g)) - L.dot(I_k_vec.dot(np.transpose(L)))
-        P, eigenvals = np.linalg.eig(A)[0]
-        eigenvals = np.clip(eigenvals, 0, init_radius)
-        eigenvals = np.diag(eigenvals)
-        A = np.transpose(P).dot(eigenvals.dot(P))
-    else:
-        L_g = np.dot(np.transpose(L), g)
-        I_k_L = np.multiply(I_k_vec, L_g)
-        A_g = scaling * g - L.dot(I_k_L)
+def compute_A_g(scaling, L, I_k_vec, g):
+    L_g = np.dot(np.transpose(L), g)
+    I_k_L = np.multiply(I_k_vec, L_g)
+    A_g = scaling * g - L.dot(I_k_L)
     return A_g
 
 
@@ -95,7 +88,7 @@ def iterate_ellipsoids_accelerated(D, y, z_init, r_init, lmbda, mu, loss, penalt
             L = A_g.T
             I_k_vec = s * (2 / (p + 1)) * np.ones(1)
         else:
-            A_g = compute_A_g(r_init * (s ** k), L, I_k_vec, g, clip_ell=False, init_radius=None)
+            A_g = compute_A_g(r_init * (s ** k), L, I_k_vec, g)
             den = np.sqrt(g.dot(A_g))
             A_g = (1 / den) * A_g
             z = z - (1 / (p + 1)) * A_g
@@ -111,10 +104,9 @@ def iterate_ellipsoids_accelerated(D, y, z_init, r_init, lmbda, mu, loss, penalt
     return z, scaling, L, I_k_vec, g
 
 
-def compute_test_accelerated(D_i, y_i, z, scaling, L, I_k_vec, g, classification, cut, clip_ell, 
-init_radius):
-    A_g = compute_A_g(scaling, L, I_k_vec, g, clip_ell, init_radius)
-    A_D_i = compute_A_g(scaling, L, I_k_vec, D_i, clip_ell, init_radius)
+def compute_test_accelerated(D_i, y_i, z, scaling, L, I_k_vec, g, classification, cut):
+    A_g = compute_A_g(scaling, L, I_k_vec, g)
+    A_D_i = compute_A_g(scaling, L, I_k_vec, D_i)
     if classification:
         if cut:
             nu = - g.dot(A_D_i) / g.dot(A_g)
@@ -122,7 +114,7 @@ init_radius):
                 test = D_i.dot(z) - np.sqrt(D_i.dot(A_D_i))
             else:
                 new_D_i = D_i + nu * g
-                A_new_D_i = compute_A_g(scaling, L, I_k_vec, new_D_i, clip_ell, init_radius)
+                A_new_D_i = compute_A_g(scaling, L, I_k_vec, new_D_i)
                 mu = np.sqrt(new_D_i.dot(A_new_D_i)) / 2
                 body = D_i.dot(A_new_D_i) / (2 * mu)
                 test = D_i.dot(z) - body
@@ -136,7 +128,7 @@ init_radius):
                 test = D_i.dot(z) + np.sqrt(D_i.dot(A_D_i)) - y_i
             else:
                 new_D_i = D_i - nu * g
-                A_new_D_i = compute_A_g(scaling, L, I_k_vec, new_D_i, clip_ell, init_radius)
+                A_new_D_i = compute_A_g(scaling, L, I_k_vec, new_D_i)
                 mu = np.sqrt(new_D_i.dot(A_new_D_i)) / 2
                 body = D_i.dot(A_new_D_i) / (2 * mu)
                 test = D_i.dot(z) + body - y_i
@@ -145,8 +137,7 @@ init_radius):
     return test
 
 
-def test_dataset_accelerated(D, y, lmbda, mu, classification, loss, penalty, n_steps, intercept, cut,
-                                clip_ell, init_radius):
+def test_dataset_accelerated(D, y, lmbda, mu, classification, loss, penalty, n_steps, intercept, cut):
     if intercept:
         X = np.concatenate((D, np.ones(D.shape[0]).reshape(1,-1).T), axis=1)
         z_init = np.zeros(X.shape[1] + 1)
@@ -165,15 +156,15 @@ def test_dataset_accelerated(D, y, lmbda, mu, classification, loss, penalty, n_s
         y_ = np.zeros(len(y))
         for i in range(X.shape[0]):
             test = compute_test_accelerated(X_[i],y_[i], z, scaling, L, I_k_vec, g, 
-                classification, cut, clip_ell, init_radius)
+                classification, cut)
             if test > mu:
                 results[i] = 1
     else:
         for i in range(X.shape[0]):
             test_1 = compute_test_accelerated(X[i], y[i], z, scaling, L, I_k_vec, g, 
-                classification, cut, clip_ell, init_radius)
+                classification, cut)
             test_2 = compute_test_accelerated(-X[i],-y[i],z,scaling, L, I_k_vec, g, 
-                classification, cut, clip_ell, init_radius)
+                classification, cut)
             if test_1 < mu and test_2 < mu:
                 results[i] = 1
     end = time.time()
@@ -182,7 +173,7 @@ def test_dataset_accelerated(D, y, lmbda, mu, classification, loss, penalty, n_s
 
 
 def rank_dataset_accelerated(D, y, z, scaling, L, I_k_vec, g, lmbda, mu, classification, 
-    loss, penalty, intercept, cut, clip_ell, init_radius):
+    loss, penalty, intercept, cut):
 
     if intercept:
         X = np.concatenate((D, np.ones(D.shape[0]).reshape(1,-1).T), axis=1)
@@ -197,13 +188,13 @@ def rank_dataset_accelerated(D, y, z, scaling, L, I_k_vec, g, lmbda, mu, classif
         for i in range(X.shape[0]):
             x_i = y[i] * X[i]
             scores[i] = - compute_test_accelerated(x_i, None, z, scaling, L,
-             I_k_vec, g, classification, cut, clip_ell, init_radius)
+             I_k_vec, g, classification, cut)
     else:
         for i in range(X.shape[0]):
             test_1 = compute_test_accelerated(X[i], y[i], z, scaling, L, I_k_vec, g,
-             classification, cut, clip_ell, init_radius)
+             classification, cut)
             test_2 = compute_test_accelerated(-X[i], -y[i], z, scaling, L, I_k_vec, g,
-                classification, cut, clip_ell, init_radius)
+                classification, cut)
             scores[i] = np.maximum(test_1, test_2)
     end = time.time()
     print('Time to rank the entire dataset:', end - start)

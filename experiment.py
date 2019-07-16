@@ -9,13 +9,15 @@ from tools import (
 )
 from screening import (
     iterate_ellipsoids_accelerated,
-    rank_dataset_accelerated
+    rank_dataset_accelerated,
+    rank_dataset
 )
 from sklearn.datasets import load_diabetes, load_boston, fetch_20newsgroups
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.svm import LinearSVC
 from sklearn.linear_model import Lasso
 from sklearn.utils import shuffle
+from sklearn.preprocessing import StandardScaler
 import random
 import scipy.io
 import pickle
@@ -107,7 +109,7 @@ def fit_estimator(X, y, loss, penalty, lmbda, intercept, max_iter=10000):
     return estimator
 
 def experiment_get_ellipsoid(X, y, intercept, better_init, better_radius, loss, penalty, 
-                                lmbda, classification, mu, n_ellipsoid_steps, clip_ell):
+                                lmbda, classification, mu, n_ellipsoid_steps):
     if intercept:
         z_init = np.zeros(X.shape[1] + 1)
         r_init = X.shape[1] + 1
@@ -128,17 +130,15 @@ def experiment_get_ellipsoid(X, y, intercept, better_init, better_radius, loss, 
         r_init = float(better_radius)                            
     z, scaling, L, I_k_vec, g = iterate_ellipsoids_accelerated(X, y, z_init,
                                 r_init, lmbda, mu, loss, penalty, n_ellipsoid_steps, intercept)
-    if clip_ell:
-            scaling = r_init
-    return z, scaling, L, I_k_vec, g
+    return z, scaling, L, I_k_vec, g, r_init
 
 #@profile
-def experiment(path, dataset, size, redundant, noise, nb_delete_steps, lmbda, mu, classification, 
+def experiment(path, dataset, size, scale_data, redundant, noise, nb_delete_steps, lmbda, mu, classification, 
                 loss, penalty, intercept, classif_score, n_ellipsoid_steps, better_init, 
                 better_radius, cut, get_ell_from_subset, clip_ell, nb_exp, nb_test, plot, zoom):  
-    exp_title = 'X_size_{}_sub_ell_{}_lmbda_{}_n_ellipsoid_{}_intercept_{}_mu_{}_redundant_{}_noise_{}_better_init_{}_better_radius_{}'.format(size, 
+    exp_title = 'X_size_{}_sub_ell_{}_lmbda_{}_n_ellipsoid_{}_intercept_{}_mu_{}_redundant_{}_noise_{}_better_init_{}_better_radius_{}_clip_ell_{}'.format(size, 
         get_ell_from_subset, lmbda, n_ellipsoid_steps, intercept, mu, redundant, noise, better_init, 
-        better_radius)
+        better_radius, clip_ell)
 
     X, y = load_experiment(dataset, size, redundant, noise, classification, path + 'datasets/')
 
@@ -154,21 +154,34 @@ def experiment(path, dataset, size, redundant, noise, nb_delete_steps, lmbda, mu
         np.random.seed(compt_exp)
         compt_exp += 1
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+        if scale_data:
+            scaler = StandardScaler()
+            X_train = scaler.fit_transform(X_train)
+            X_test = scaler.transform(X_test)
         if get_ell_from_subset != 0:
             X_train_, y_train_ = balanced_subsample(X_train, y_train)
             X_train_, y_train_ = shuffle(X_train_, y_train_)
             if get_ell_from_subset < X_train_.shape[0]:
                 X_train_ = X_train_[:get_ell_from_subset]
                 y_train_ = y_train_[:get_ell_from_subset]
-            z, scaling, L, I_k_vec, g = experiment_get_ellipsoid(X_train_, y_train_, intercept, better_init, 
+            z, scaling, L, I_k_vec, g, r_init = experiment_get_ellipsoid(X_train_, y_train_, intercept, better_init, 
                                                             better_radius, loss, penalty, lmbda, 
-                                                            classification, mu, n_ellipsoid_steps, clip_ell)
+                                                            classification, mu, n_ellipsoid_steps)
         else:
-            z, scaling, L, I_k_vec, g = experiment_get_ellipsoid(X_train, y_train, intercept, better_init, 
+            z, scaling, L, I_k_vec, g, r_init = experiment_get_ellipsoid(X_train, y_train, intercept, better_init, 
                                                             better_radius, loss, penalty, lmbda, 
-                                                            classification, mu, n_ellipsoid_steps, clip_ell)
-                                                        
-        scores = rank_dataset_accelerated(X_train, y_train, z, scaling, L, I_k_vec, g,
+                                                            classification, mu, n_ellipsoid_steps)
+        if clip_ell:
+            I_k_vec = I_k_vec.reshape(-1,1)
+            A = scaling * np.identity(X.shape[1]) - L.dot(np.multiply(I_k_vec, np.transpose(L)))
+            eigenvals, eigenvect = np.linalg.eigh(A)
+            eigenvals = np.clip(eigenvals, 0, r_init)
+            eigenvals = eigenvals.reshape(-1,1)
+            A = eigenvect.dot(np.multiply(eigenvals, np.transpose(eigenvect)))
+            scores = rank_dataset(X_train, y_train, z, A, g,
+                                             lmbda, mu, classification, loss, penalty, intercept, cut)
+        else:                            
+            scores = rank_dataset_accelerated(X_train, y_train, z, scaling, L, I_k_vec, g,
                                              lmbda, mu, classification, loss, penalty, intercept, cut)
         idx_not_safe = get_idx_not_safe(scores, mu)
         idx_not_safe_all += idx_not_safe
@@ -234,6 +247,7 @@ if __name__ == '__main__':
     parser.add_argument('--path', default='./', type=str)
     parser.add_argument('--dataset', default='diabetes', help='dataset used for the experiment')
     parser.add_argument('--size', default=442, type=int, help='number of samples of the dataset to use')
+    parser.add_argument('--scale_data', action='store_true')
     parser.add_argument('--redundant', default=400, type=int, help='add redundant examples to the dataset. Do not use redundant with --size')
     parser.add_argument('--noise', default=0.1, type=float, help='standard deviation of the noise to add to the redundant examples')
     parser.add_argument('--nb_delete_steps', default=20, type=int, help='at each step of the experiment, we delete size / nb_delete_steps data points')
@@ -258,7 +272,7 @@ if __name__ == '__main__':
 
     print('START')
 
-    experiment(args.path, args.dataset, args.size, args.redundant, args.noise, args.nb_delete_steps, 
+    experiment(args.path, args.dataset, args.size, args.scale_data, args.redundant, args.noise, args.nb_delete_steps, 
         args.lmbda, args.mu, 
         args.classification, args.loss, args.penalty, args.intercept, args.classif_score, 
         args.n_ellipsoid_steps, args.better_init, args.better_radius, args.cut, 

@@ -135,7 +135,8 @@ def experiment_get_ellipsoid(X, y, intercept, better_init, better_radius, loss, 
 #@profile
 def experiment(path, dataset, size, scale_data, redundant, noise, nb_delete_steps, lmbda, mu, classification, 
                 loss, penalty, intercept, classif_score, n_ellipsoid_steps, better_init, 
-                better_radius, cut, get_ell_from_subset, clip_ell, nb_exp, nb_test, plot, zoom):  
+                better_radius, cut, get_ell_from_subset, clip_ell, nb_exp, nb_test, plot, zoom, 
+                dontsave):  
     exp_title = 'X_size_{}_sub_ell_{}_lmbda_{}_n_ellipsoid_{}_intercept_{}_mu_{}_redundant_{}_noise_{}_better_init_{}_better_radius_{}_clip_ell_{}'.format(size, 
         get_ell_from_subset, lmbda, n_ellipsoid_steps, intercept, mu, redundant, noise, better_init, 
         better_radius, clip_ell)
@@ -210,9 +211,6 @@ def experiment(path, dataset, size, scale_data, redundant, noise, nb_delete_step
                 estimator_screened = fit_estimator(X_screened, y_screened, loss, penalty, lmbda, 
                 intercept)
                 estimator_r = fit_estimator(X_r, y_r, loss, penalty, lmbda, intercept)
-                if compt == 1 and compt_exp == 1:
-                    #print('ESTIMATOR SOLUTION', estimator_regular.coef_)
-                    pass
                 if classif_score:
                     score_regular += scoring_classif(estimator_regular, X_test, y_test)
                     score_screened += scoring_classif(estimator_screened, X_test, y_test)
@@ -235,7 +233,8 @@ def experiment(path, dataset, size, scale_data, redundant, noise, nb_delete_step
         np.floor(idx_not_safe / nb_exp), X_train.shape[0])
     save_dataset_folder = os.path.join(path, 'results', dataset)
     os.makedirs(save_dataset_folder, exist_ok=True)
-    np.save(os.path.join(save_dataset_folder, exp_title), data)
+    if not dontsave:
+        np.save(os.path.join(save_dataset_folder, exp_title), data)
 
     if plot:
         plot_experiment(data, zoom=zoom, name=None, save=False)
@@ -263,11 +262,12 @@ if __name__ == '__main__':
     parser.add_argument('--better_radius', default=10, type=float, help='radius of the initial l2 ball')
     parser.add_argument('--cut', action='store_true', help='cut the final ellipsoid in half using a subgradient of the loss')
     parser.add_argument('--get_ell_from_subset', default=0, type=int, help='train the ellipsoid on a random subset of the dataset')
-    parser.add_argument('--clip_ell', action='store_true')
+    parser.add_argument('--clip_ell', action='store_true', help='clip the eigenvalues of the ellipsoid')
     parser.add_argument('--nb_exp', default=10, type=int)
     parser.add_argument('--nb_test', default=3, type=int)
     parser.add_argument('--plot', action='store_true')
     parser.add_argument('--zoom', default=[0.2, 0.6], nargs='+', type=float, help='zoom in the final plot')
+    parser.add_argument('--dontsave', action='store_true', help='do not save your experiment')
     args = parser.parse_args()
 
     print('START')
@@ -276,4 +276,5 @@ if __name__ == '__main__':
         args.lmbda, args.mu, 
         args.classification, args.loss, args.penalty, args.intercept, args.classif_score, 
         args.n_ellipsoid_steps, args.better_init, args.better_radius, args.cut, 
-        args.get_ell_from_subset, args.clip_ell, args.nb_exp, args.nb_test, args.plot, args.zoom)
+        args.get_ell_from_subset, args.clip_ell, args.nb_exp, args.nb_test, args.plot, args.zoom,
+        args.dontsave)

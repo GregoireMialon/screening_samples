@@ -184,11 +184,14 @@ def screen(X, y, scores, nb_to_delete):
     return X_screened, y_screened
 
 
-def get_idx_not_safe(scores, mu):
+def get_idx_safe(scores, mu, classification):
     scores = np.array(scores)
-    idx = np.where(scores < mu)[0]
-    idx_not_safe = len(idx)
-    return idx_not_safe
+    if classification:
+        idx = np.where(scores < - mu)[0]
+    else:
+        idx = np.where(scores < mu)[0]
+    idx_safe = len(idx)
+    return idx_safe
 
 
 def scoring_classif(estimator, X, y):

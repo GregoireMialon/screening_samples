@@ -4,7 +4,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from tools import (
     make_data, make_redundant_data, make_redundant_data_classification, 
-    balanced_subsample, random_screening, dataset_has_both_labels, screen, get_idx_not_safe, 
+    balanced_subsample, random_screening, dataset_has_both_labels, screen, get_idx_safe, 
     scoring_classif, plot_experiment
 )
 from screening import (
@@ -137,9 +137,9 @@ def experiment(path, dataset, size, scale_data, redundant, noise, nb_delete_step
                 loss, penalty, intercept, classif_score, n_ellipsoid_steps, better_init, 
                 better_radius, cut, get_ell_from_subset, clip_ell, nb_exp, nb_test, plot, zoom, 
                 dontsave):  
-    exp_title = 'X_size_{}_sub_ell_{}_lmbda_{}_n_ellipsoid_{}_intercept_{}_mu_{}_redundant_{}_noise_{}_better_init_{}_better_radius_{}_clip_ell_{}'.format(size, 
+    exp_title = 'X_size_{}_sub_ell_{}_lmbda_{}_n_ellipsoid_{}_intercept_{}_mu_{}_redundant_{}_noise_{}_better_init_{}_better_radius_{}_cut_ell_{}_clip_ell_{}'.format(size, 
         get_ell_from_subset, lmbda, n_ellipsoid_steps, intercept, mu, redundant, noise, better_init, 
-        better_radius, clip_ell)
+        better_radius, cut, clip_ell)
 
     X, y = load_experiment(dataset, size, redundant, noise, classification, path + 'datasets/')
 
@@ -148,7 +148,7 @@ def experiment(path, dataset, size, scale_data, redundant, noise, nb_delete_step
     scores_r_all = []
 
     compt_exp = 0
-    idx_not_safe_all = 0
+    idx_safe_all = 0
     
     while compt_exp < nb_exp:
         random.seed(compt_exp)
@@ -184,8 +184,10 @@ def experiment(path, dataset, size, scale_data, redundant, noise, nb_delete_step
         else:                            
             scores = rank_dataset_accelerated(X_train, y_train, z, scaling, L, I_k_vec, g,
                                              lmbda, mu, classification, loss, penalty, intercept, cut)
-        idx_not_safe = get_idx_not_safe(scores, mu)
-        idx_not_safe_all += idx_not_safe
+        #print('MEAN SCORES', np.mean(scores))
+        idx_safe = get_idx_safe(scores, mu, classification)
+        #print(idx_safe)
+        idx_safe_all += idx_safe
         scores_regular = []
         scores_screened = []
         scores_r= []
@@ -227,10 +229,10 @@ def experiment(path, dataset, size, scale_data, redundant, noise, nb_delete_step
         scores_screened_all.append(scores_screened)
         scores_r_all.append(scores_r)
 
-    print('Number of datapoints we can screen (if safe rules apply to the experiment):', idx_not_safe / nb_exp)
+    print('Number of datapoints we can screen (if safe rules apply to the experiment):', idx_safe_all / nb_exp)
 
     data = (nb_to_del_table, scores_regular_all, scores_screened_all, scores_r_all, 
-        np.floor(idx_not_safe / nb_exp), X_train.shape[0])
+        np.floor(idx_safe / nb_exp), X_train.shape[0])
     save_dataset_folder = os.path.join(path, 'results', dataset)
     os.makedirs(save_dataset_folder, exist_ok=True)
     if not dontsave:

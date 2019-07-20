@@ -119,6 +119,13 @@ def compute_test_accelerated(D_i, y_i, z, scaling, L, I_k_vec, g, classification
                 test = D_i.dot(z) - body
         else:
             test = D_i.dot(z) - np.sqrt(D_i.dot(A_D_i))
+            #print(np.linalg.norm(D_i), D_i)
+            #frac = np.sqrt(D_i.dot(A_D_i))
+            #x_opt = z - A_D_i / frac
+            #x_norm = np.linalg.norm(x_opt)
+            #print('X_NORM', x_norm)
+            #x_opt = x_opt / x_norm
+            #test = D_i.dot(x_opt)
 
     else:
         if cut:
@@ -213,7 +220,7 @@ def compute_test(D_i, y_i, z, A, g, classification, cut):
                 test = D_i.dot(z) - body
         else:
             test = D_i.dot(z) - np.sqrt(D_i.dot(A_D_i))
-
+        
     else:
         if cut:
             nu = g.dot(A_D_i) / g.dot(A_g)

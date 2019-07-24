@@ -114,18 +114,11 @@ def compute_test_accelerated(D_i, y_i, z, scaling, L, I_k_vec, g, classification
             else:
                 new_D_i = D_i + nu * g
                 A_new_D_i = compute_A_g(scaling, L, I_k_vec, new_D_i)
-                mu = np.sqrt(new_D_i.dot(A_new_D_i)) / 2
-                body = D_i.dot(A_new_D_i) / (2 * mu)
+                mu = np.sqrt(new_D_i.dot(A_new_D_i))
+                body = D_i.dot(A_new_D_i) / mu
                 test = D_i.dot(z) - body
         else:
             test = D_i.dot(z) - np.sqrt(D_i.dot(A_D_i))
-            #print(np.linalg.norm(D_i), D_i)
-            #frac = np.sqrt(D_i.dot(A_D_i))
-            #x_opt = z - A_D_i / frac
-            #x_norm = np.linalg.norm(x_opt)
-            #print('X_NORM', x_norm)
-            #x_opt = x_opt / x_norm
-            #test = D_i.dot(x_opt)
 
     else:
         if cut:
@@ -135,8 +128,8 @@ def compute_test_accelerated(D_i, y_i, z, scaling, L, I_k_vec, g, classification
             else:
                 new_D_i = D_i - nu * g
                 A_new_D_i = compute_A_g(scaling, L, I_k_vec, new_D_i)
-                mu = np.sqrt(new_D_i.dot(A_new_D_i)) / 2
-                body = D_i.dot(A_new_D_i) / (2 * mu)
+                mu = np.sqrt(new_D_i.dot(A_new_D_i))
+                body = D_i.dot(A_new_D_i) / mu
                 test = D_i.dot(z) + body - y_i
         else:
             test = D_i.dot(z) + np.sqrt(D_i.dot(A_D_i)) - y_i

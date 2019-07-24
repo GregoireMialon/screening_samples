@@ -140,6 +140,7 @@ def experiment(path, dataset, size, scale_data, redundant, noise, nb_delete_step
     exp_title = 'X_size_{}_sub_ell_{}_lmbda_{}_n_ellipsoid_{}_intercept_{}_mu_{}_redundant_{}_noise_{}_better_init_{}_better_radius_{}_cut_ell_{}_clip_ell_{}'.format(size, 
         get_ell_from_subset, lmbda, n_ellipsoid_steps, intercept, mu, redundant, noise, better_init, 
         better_radius, cut, clip_ell)
+    print(exp_title)
 
     X, y = load_experiment(dataset, size, redundant, noise, classification, path + 'datasets/')
 
@@ -237,6 +238,7 @@ def experiment(path, dataset, size, scale_data, redundant, noise, nb_delete_step
     os.makedirs(save_dataset_folder, exist_ok=True)
     if not dontsave:
         np.save(os.path.join(save_dataset_folder, exp_title), data)
+        print('RESULTS SAVED!')
 
     if plot:
         plot_experiment(data, zoom=zoom, name=None, save=False)

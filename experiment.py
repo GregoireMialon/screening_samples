@@ -205,6 +205,10 @@ def experiment(path, dataset, size, scale_data, redundant, noise, nb_delete_step
             compt = 0
             X_screened, y_screened = screen(X_train, y_train, scores, nb_to_delete)
             X_r, y_r = random_screening(X_r, y_r, X_train.shape[0] - nb_to_delete)
+            if not(dataset_has_both_labels(y_r)):
+                print('Warning, only one label in randomly screened dataset')
+            if not(dataset_has_both_labels(y_screened)):
+                print('Warning, only one label in screened dataset')
             if not(dataset_has_both_labels(y_r) and dataset_has_both_labels(y_screened)):
                 break
             print(X_train.shape, X_screened.shape, X_r.shape)
@@ -257,14 +261,14 @@ if __name__ == '__main__':
     parser.add_argument('--lmbda', default=0.01, type=float, help='regularization parameter of the estimator')
     parser.add_argument('--mu', default=10, type=float, help='regularization parameter of the dual')
     parser.add_argument('--classification', action='store_true')
-    parser.add_argument('--loss', default='truncated_squared', choices=['hinge','truncated_squared'])
+    parser.add_argument('--loss', default='truncated_squared', choices=['hinge','squared','truncated_squared'])
     parser.add_argument('--penalty', default='l1', choices=['l1','l2'])
     parser.add_argument('--intercept', action='store_true')
     parser.add_argument('--classif_score', action='store_true', help='determines the score that is used')
     parser.add_argument('--n_ellipsoid_steps', default=1000, type=int, help='number of iterations of the ellipsoid method')
     parser.add_argument('--better_init', default=10, type=int, help='number of optimizer gradient steps to initialize the center of the ellipsoid')
     parser.add_argument('--better_radius', default=10, type=float, help='radius of the initial l2 ball')
-    parser.add_argument('--cut', action='store_true', help='cut the final ellipsoid in half using a subgradient of the loss')
+    parser.add_argument('--cut_ell', action='store_true', help='cut the final ellipsoid in half using a subgradient of the loss')
     parser.add_argument('--get_ell_from_subset', default=0, type=int, help='train the ellipsoid on a random subset of the dataset')
     parser.add_argument('--clip_ell', action='store_true', help='clip the eigenvalues of the ellipsoid')
     parser.add_argument('--nb_exp', default=10, type=int)
@@ -279,6 +283,6 @@ if __name__ == '__main__':
     experiment(args.path, args.dataset, args.size, args.scale_data, args.redundant, args.noise, args.nb_delete_steps, 
         args.lmbda, args.mu, 
         args.classification, args.loss, args.penalty, args.intercept, args.classif_score, 
-        args.n_ellipsoid_steps, args.better_init, args.better_radius, args.cut, 
+        args.n_ellipsoid_steps, args.better_init, args.better_radius, args.cut_ell, 
         args.get_ell_from_subset, args.clip_ell, args.nb_exp, args.nb_test, args.plot, args.zoom,
         args.dontsave)

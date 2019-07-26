@@ -44,6 +44,9 @@ def compute_subgradient(x, D, y, lmbda, mu, loss, penalty, intercept):
         output = y * D.dot(x)
         g_1 = compute_hinge_subgradient(output, mu)
         g_1 = (np.transpose(D).dot(y * g_1))
+    elif loss == 'squared':
+        output = D.dot(x) - y
+        g_1 = (1 / D.shape[0]) * np.transpose(D).dot(output)
     if penalty == 'l2':
         g_2 = np.copy(x)
         if intercept:
@@ -114,8 +117,8 @@ def compute_test_accelerated(D_i, y_i, z, scaling, L, I_k_vec, g, classification
             else:
                 new_D_i = D_i + nu * g
                 A_new_D_i = compute_A_g(scaling, L, I_k_vec, new_D_i)
-                mu = np.sqrt(new_D_i.dot(A_new_D_i))
-                body = D_i.dot(A_new_D_i) / mu
+                nu_ = np.sqrt(new_D_i.dot(A_new_D_i))
+                body = D_i.dot(A_new_D_i) / nu_
                 test = D_i.dot(z) - body
         else:
             test = D_i.dot(z) - np.sqrt(D_i.dot(A_D_i))
@@ -128,11 +131,12 @@ def compute_test_accelerated(D_i, y_i, z, scaling, L, I_k_vec, g, classification
             else:
                 new_D_i = D_i - nu * g
                 A_new_D_i = compute_A_g(scaling, L, I_k_vec, new_D_i)
-                mu = np.sqrt(new_D_i.dot(A_new_D_i))
-                body = D_i.dot(A_new_D_i) / mu
+                nu_ = np.sqrt(new_D_i.dot(A_new_D_i))
+                body = D_i.dot(A_new_D_i) / nu_
                 test = D_i.dot(z) + body - y_i
         else:
             test = D_i.dot(z) + np.sqrt(D_i.dot(A_D_i)) - y_i
+    print('LABEL', y_i, 'TEST', test)
     return test
 
 
@@ -153,7 +157,7 @@ def test_dataset_accelerated(D, y, lmbda, mu, classification, loss, penalty, n_s
     if classification:
         for i in range(X.shape[0]):
             x_i = y[i] * X[i]
-            test = compute_test_accelerated(x_i, None, z, scaling, L, I_k_vec, g, 
+            test = compute_test_accelerated(x_i, y[i], z, scaling, L, I_k_vec, g, 
                 classification, cut)
             if test > mu:
                 results[i] = 1
@@ -183,7 +187,7 @@ def rank_dataset_accelerated(D, y, z, scaling, L, I_k_vec, g, lmbda, mu, classif
     if classification:
         for i in range(X.shape[0]):
             x_i = y[i] * X[i]
-            scores[i] = - compute_test_accelerated(x_i, None, z, scaling, L,
+            scores[i] = - compute_test_accelerated(x_i, y[i], z, scaling, L,
              I_k_vec, g, classification, cut)
     else:
         for i in range(X.shape[0]):
@@ -208,8 +212,8 @@ def compute_test(D_i, y_i, z, A, g, classification, cut):
             else:
                 new_D_i = D_i + nu * g
                 A_new_D_i = A.dot(new_D_i)
-                mu = np.sqrt(new_D_i.dot(A_new_D_i)) / 2
-                body = D_i.dot(A_new_D_i) / (2 * mu)
+                nu_ = np.sqrt(new_D_i.dot(A_new_D_i)) 
+                body = D_i.dot(A_new_D_i) / nu_
                 test = D_i.dot(z) - body
         else:
             test = D_i.dot(z) - np.sqrt(D_i.dot(A_D_i))
@@ -222,8 +226,8 @@ def compute_test(D_i, y_i, z, A, g, classification, cut):
             else:
                 new_D_i = D_i - nu * g
                 A_new_D_i = A.dot(new_D_i)
-                mu = np.sqrt(new_D_i.dot(A_new_D_i)) / 2
-                body = D_i.dot(A_new_D_i) / (2 * mu)
+                nu_ = np.sqrt(new_D_i.dot(A_new_D_i)) 
+                body = D_i.dot(A_new_D_i) / nu_
                 test = D_i.dot(z) + body - y_i
         else:
             test = D_i.dot(z) + np.sqrt(D_i.dot(A_D_i)) - y_i

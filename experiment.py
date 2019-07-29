@@ -65,6 +65,11 @@ def load_higgs(path):
     y =data_higgs[1]
     return X, y
 
+def load_synthetic(path):
+    X = np.load(path + 'synthetic_X.npy')
+    y = np.load(path + 'synthetic_y.npy') 
+    return X, y
+
 def load_experiment(dataset, synth_params, size, redundant, noise, classification, path):
     if dataset == 'leukemia':
         X, y = load_leukemia(path)
@@ -85,6 +90,8 @@ def load_experiment(dataset, synth_params, size, redundant, noise, classificatio
     elif dataset == 'synthetic':
         X, y, _, _ = make_data(synth_params[0], synth_params[1], synth_params[2]) #old params: 100, 2, 0.5
         #print('TRUE SYNTHETIC PARAMETERS', true_params)
+    elif dataset == 'fixed_synthetic':
+        X, y = load_synthetic(path)
     if redundant != 0 and not(classification):
         dataset+= '_redundant'
         X, y = make_redundant_data(X, y, int(redundant), noise)

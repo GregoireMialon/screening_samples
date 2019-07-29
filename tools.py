@@ -10,7 +10,7 @@ from sklearn.utils import shuffle
 import matplotlib.pyplot as plt
 
 
-def make_data(n, p, sparsity, noise=True):
+def make_data(n, p, sparsity, noise=True, save=False):
     X = np.zeros((n,p))
     y = np.zeros(n)
     true_params = rand(p, 1, density = sparsity).A.ravel()
@@ -29,10 +29,12 @@ def make_data(n, p, sparsity, noise=True):
         X[i,:] = x
         y[i] = np.dot(true_params,x)
         if noise:
-            w = np.random.randn(1) / 10
+            w = np.random.randn(1) / 100 # ancien param 10 mais faux
             y[i] += w
             noise_norm += (np.linalg.norm(w)) ** 2
-
+    if save:
+        np.save('datasets/synthetic_X', X)
+        np.save('datasets/synthetic_y', y)
     return X, y, true_params, np.sqrt(noise_norm)
 
 
@@ -253,3 +255,58 @@ def plot_experiment(data, train_set_size=None, zoom=None, name=None, save=False)
     #ax1.legend()
     plt.show()
     return
+
+def plot_experiment_merged(datas, train_set_size=None, zoom=None, name=None, save=False):
+
+    data = datas[0]
+    data_to_add = datas[1]
+
+    if len(data) == 6:
+        train_set_size = data[5]
+    nb_to_del_table = data[0] / train_set_size
+    scores_regular_all = np.array(cut_list(data[1]))
+    scores_screened_all = np.array(cut_list(data[2]))
+    scores_r_all = np.array(cut_list(data[3]))
+    scores_screened_to_add_all = np.array(cut_list(data_to_add[2]))
+    safe_fraction = data[4] / train_set_size
+
+    scores_regular_mean = np.mean(scores_regular_all, 0)
+    scores_screened_mean = np.mean(scores_screened_all, 0)
+    scores_r_mean = np.mean(scores_r_all, 0)
+    scores_regular_to_add_mean = np.mean(scores_screened_to_add_all, 0)
+    
+    scores_regular_var = np.sqrt(np.var(scores_regular_all, 0))
+    scores_screened_var = np.sqrt(np.var(scores_screened_all, 0))
+    scores_r_var = np.sqrt(np.var(scores_r_all, 0))
+    scores_regular_to_add_var = np.sqrt(np.var(scores_screened_to_add_all, 0))
+
+    fig, ax1 = plt.subplots(figsize=(14, 8))
+
+    a = ax1.errorbar(nb_to_del_table[:len(scores_regular_mean)], scores_regular_mean, yerr=scores_regular_var, linewidth=5, capsize=10, 
+                     markeredgewidth=5)
+    b = ax1.errorbar(nb_to_del_table[:len(scores_regular_mean)], scores_screened_mean, yerr=scores_screened_var, linewidth=5, capsize=10, 
+                     markeredgewidth=5, color='orange')
+    c = ax1.errorbar(nb_to_del_table[:len(scores_regular_mean)], scores_r_mean, yerr=scores_r_var, linewidth=5, capsize=10, markeredgewidth=5, 
+                     color='mediumseagreen')
+    d = ax1.errorbar(nb_to_del_table[:len(scores_regular_mean)], scores_regular_to_add_mean, yerr=scores_regular_to_add_var, linewidth=5, capsize=10, 
+                     markeredgewidth=5)
+    ax1.legend([a, b, c, d], ["Trained on whole dataset", "Trained on screened dataset", "Trained on random subset", "Trained on screened dataset (no margin)"],
+                prop={"size": 25})
+    
+    if zoom !=None:
+        ax1.set_ylim(zoom)
+    
+    ax1.set_xlabel('Fraction of points deleted (SAFE until {})'.format(safe_fraction), fontsize=45)
+    ax1.set_ylabel('Score on test set', fontsize=45)
+    ax1.tick_params('y', labelsize=30)
+    ax1.tick_params('x', labelsize=30)
+    fig.tight_layout()
+    #ax1.legend()
+    plt.show()
+    return
+
+if __name__ == "__main__":
+    
+    make_data(100, 500, 10 / 500, noise=True, save=True)
+        
+

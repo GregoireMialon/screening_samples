@@ -136,7 +136,7 @@ def compute_test_accelerated(D_i, y_i, z, scaling, L, I_k_vec, g, classification
                 test = D_i.dot(z) + body - y_i
         else:
             test = D_i.dot(z) + np.sqrt(D_i.dot(A_D_i)) - y_i
-    print('LABEL', y_i, 'TEST', test)
+    #print('LABEL', y_i, 'TEST', test)
     return test
 
 

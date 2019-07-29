@@ -65,7 +65,7 @@ def load_higgs(path):
     y =data_higgs[1]
     return X, y
 
-def load_experiment(dataset, size, redundant, noise, classification, path):
+def load_experiment(dataset, synth_params, size, redundant, noise, classification, path):
     if dataset == 'leukemia':
         X, y = load_leukemia(path)
     elif dataset == 'boston':
@@ -83,8 +83,8 @@ def load_experiment(dataset, size, redundant, noise, classification, path):
     elif dataset == 'higgs':
         X, y = load_higgs(path)
     elif dataset == 'synthetic':
-        X, y, true_params, _ = make_data(100, 2, 0.5)
-        print('TRUE SYNTHETIC PARAMETERS', true_params)
+        X, y, _, _ = make_data(synth_params[0], synth_params[1], synth_params[2]) #old params: 100, 2, 0.5
+        #print('TRUE SYNTHETIC PARAMETERS', true_params)
     if redundant != 0 and not(classification):
         dataset+= '_redundant'
         X, y = make_redundant_data(X, y, int(redundant), noise)
@@ -99,6 +99,9 @@ def load_experiment(dataset, size, redundant, noise, classification, path):
 
 def fit_estimator(X, y, loss, penalty, lmbda, intercept, max_iter=10000):
     if loss == 'truncated_squared' and penalty == 'l1':
+        estimator = Lasso(alpha=lmbda, fit_intercept=intercept, 
+                        max_iter=max_iter).fit(X, y)
+    elif loss == 'squared' and penalty == 'l1':
         estimator = Lasso(alpha=lmbda, fit_intercept=intercept, 
                         max_iter=max_iter).fit(X, y)
     elif loss == 'hinge' and penalty == 'l2':
@@ -133,16 +136,16 @@ def experiment_get_ellipsoid(X, y, intercept, better_init, better_radius, loss, 
     return z, scaling, L, I_k_vec, g, r_init
 
 #@profile
-def experiment(path, dataset, size, scale_data, redundant, noise, nb_delete_steps, lmbda, mu, classification, 
+def experiment(path, dataset, synth_params, size, scale_data, redundant, noise, nb_delete_steps, lmbda, mu, classification, 
                 loss, penalty, intercept, classif_score, n_ellipsoid_steps, better_init, 
                 better_radius, cut, get_ell_from_subset, clip_ell, nb_exp, nb_test, plot, zoom, 
                 dontsave):  
-    exp_title = 'X_size_{}_sub_ell_{}_lmbda_{}_n_ellipsoid_{}_intercept_{}_mu_{}_redundant_{}_noise_{}_better_init_{}_better_radius_{}_cut_ell_{}_clip_ell_{}'.format(size, 
-        get_ell_from_subset, lmbda, n_ellipsoid_steps, intercept, mu, redundant, noise, better_init, 
+    exp_title = 'X_size_{}_sub_ell_{}_loss_{}_lmbda_{}_n_ellipsoid_{}_intercept_{}_mu_{}_redundant_{}_noise_{}_better_init_{}_better_radius_{}_cut_ell_{}_clip_ell_{}'.format(size, 
+        get_ell_from_subset, loss, lmbda, n_ellipsoid_steps, intercept, mu, redundant, noise, better_init, 
         better_radius, cut, clip_ell)
     print(exp_title)
 
-    X, y = load_experiment(dataset, size, redundant, noise, classification, path + 'datasets/')
+    X, y = load_experiment(dataset, synth_params, size, redundant, noise, classification, path + 'datasets/')
 
     scores_regular_all = []
     scores_screened_all = []
@@ -253,6 +256,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--path', default='./', type=str)
     parser.add_argument('--dataset', default='diabetes', help='dataset used for the experiment')
+    parser.add_argument('--synth_params', default=[100, 500, 10 / 500], nargs='+', type=float, help='in order: nb_samples, dimension, sparsity')
     parser.add_argument('--size', default=442, type=int, help='number of samples of the dataset to use')
     parser.add_argument('--scale_data', action='store_true')
     parser.add_argument('--redundant', default=400, type=int, help='add redundant examples to the dataset. Do not use redundant with --size')
@@ -266,8 +270,8 @@ if __name__ == '__main__':
     parser.add_argument('--intercept', action='store_true')
     parser.add_argument('--classif_score', action='store_true', help='determines the score that is used')
     parser.add_argument('--n_ellipsoid_steps', default=1000, type=int, help='number of iterations of the ellipsoid method')
-    parser.add_argument('--better_init', default=10, type=int, help='number of optimizer gradient steps to initialize the center of the ellipsoid')
-    parser.add_argument('--better_radius', default=10, type=float, help='radius of the initial l2 ball')
+    parser.add_argument('--better_init', default=0, type=int, help='number of optimizer gradient steps to initialize the center of the ellipsoid')
+    parser.add_argument('--better_radius', default=0, type=float, help='radius of the initial l2 ball')
     parser.add_argument('--cut_ell', action='store_true', help='cut the final ellipsoid in half using a subgradient of the loss')
     parser.add_argument('--get_ell_from_subset', default=0, type=int, help='train the ellipsoid on a random subset of the dataset')
     parser.add_argument('--clip_ell', action='store_true', help='clip the eigenvalues of the ellipsoid')
@@ -275,12 +279,12 @@ if __name__ == '__main__':
     parser.add_argument('--nb_test', default=3, type=int)
     parser.add_argument('--plot', action='store_true')
     parser.add_argument('--zoom', default=[0.2, 0.6], nargs='+', type=float, help='zoom in the final plot')
-    parser.add_argument('--dontsave', action='store_true', help='do not save your experiment')
+    parser.add_argument('--dontsave', action='store_true', help='do not save your experiment, but no plot possible')
     args = parser.parse_args()
 
     print('START')
 
-    experiment(args.path, args.dataset, args.size, args.scale_data, args.redundant, args.noise, args.nb_delete_steps, 
+    experiment(args.path, args.dataset, args.synth_params, args.size, args.scale_data, args.redundant, args.noise, args.nb_delete_steps, 
         args.lmbda, args.mu, 
         args.classification, args.loss, args.penalty, args.intercept, args.classif_score, 
         args.n_ellipsoid_steps, args.better_init, args.better_radius, args.cut_ell, 

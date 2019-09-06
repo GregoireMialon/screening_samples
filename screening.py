@@ -10,6 +10,7 @@ from sklearn.model_selection import train_test_split
 def compute_truncated_squared_loss_gradient(u, mu):
     g = np.zeros(u.size)
     for i in range(u.size):
+        #print('U_i', np.abs(u[i]))
         if np.abs(u[i]) > mu:
             g[i] = 2 * (u[i] - np.sign(u[i]) * mu)
     return g
@@ -24,6 +25,12 @@ def compute_hinge_subgradient(u, mu):
             g[i] = np.random.rand(1)[0] - 1
     return g
 
+def compute_squared_hinge_subgradient(u, mu):
+    g = np.zeros(u.size)
+    for i in range(u.size):
+        if u[i] < mu:
+            g[i] = -2 * (mu - u[i])
+    return g
 
 def compute_l1_subgradient(u):
     g = np.zeros(u.size)
@@ -40,13 +47,17 @@ def compute_subgradient(x, D, y, lmbda, mu, loss, penalty, intercept):
         output = D.dot(x) - y
         g_1 = compute_truncated_squared_loss_gradient(output, mu)
         g_1 = (1 / (2 * D.shape[0])) * np.transpose(D).dot(g_1)
+    elif loss == 'squared':
+        output = D.dot(x) - y
+        g_1 = (1 / D.shape[0]) * np.transpose(D).dot(output)
     elif loss == 'hinge':
         output = y * D.dot(x)
         g_1 = compute_hinge_subgradient(output, mu)
         g_1 = (np.transpose(D).dot(y * g_1))
-    elif loss == 'squared':
-        output = D.dot(x) - y
-        g_1 = (1 / D.shape[0]) * np.transpose(D).dot(output)
+    elif loss == 'squared_hinge':
+        output = y * D.dot(x)
+        g_1 = compute_squared_hinge_subgradient(output, mu)
+        g_1 = (np.transpose(D).dot(y * g_1))
     if penalty == 'l2':
         g_2 = np.copy(x)
         if intercept:
@@ -55,7 +66,9 @@ def compute_subgradient(x, D, y, lmbda, mu, loss, penalty, intercept):
         g_2 = compute_l1_subgradient(x)
         if intercept:
             g_2[D.shape[1]-1] = 0
+    #print('G1', g_1, 'G2', g_2)        
     g = g_1 + lmbda * g_2
+    #print('SUBGRADIENT', g)
     return g
 
 

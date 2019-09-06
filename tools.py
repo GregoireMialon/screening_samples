@@ -178,8 +178,15 @@ def cut_list(my_list):
 
 
 def screen(X, y, scores, nb_to_delete):
-    X_screened = X
-    y_screened = y
+    #X_screened = X
+    #y_screened = y
+    idx_to_delete = np.argsort(scores)[0:nb_to_delete]
+    X_screened = np.delete(X, idx_to_delete, 0)
+    y_screened = np.delete(y, idx_to_delete, 0)
+    return X_screened, y_screened
+
+def screen_baseline_margin(X, y, model, nb_to_delete):
+    scores = np.abs(model.predict(X) - y)
     idx_to_delete = np.argsort(scores)[0:nb_to_delete]
     X_screened = np.delete(X, idx_to_delete, 0)
     y_screened = np.delete(y, idx_to_delete, 0)
@@ -215,9 +222,9 @@ def scoring_interval_regression(y, y_predict, y_predict_screened, mu):
     return score_screened / score
 
 
-def plot_experiment(data, train_set_size=None, zoom=None, name=None, save=False):
+def plot_experiment(data, margin=False, train_set_size=None, zoom=None):
 
-    if len(data) == 6:
+    if len(data) >= 6:
         train_set_size = data[5]
     nb_to_del_table = data[0] / train_set_size
     scores_regular_all = np.array(cut_list(data[1]))
@@ -243,7 +250,13 @@ def plot_experiment(data, train_set_size=None, zoom=None, name=None, save=False)
                      color='mediumseagreen')
     ax1.legend([a, b, c], ["Trained on whole dataset", "Trained on screened dataset", "Trained on random subset"],
                 prop={"size": 25})
-    
+    if margin:
+        scores_margin_all = np.array(cut_list(data[6]))
+        scores_margin_mean = np.mean(scores_margin_all, 0)
+        scores_margin_var = np.sqrt(np.var(scores_margin_all, 0))
+        d = ax1.errorbar(nb_to_del_table[:len(scores_regular_mean)], scores_margin_mean, yerr=scores_margin_var, linewidth=5, capsize=10, markeredgewidth=5)
+        ax1.legend([a, b, c, d], ["Trained on whole dataset", "Trained on screened dataset", "Trained on random subset", "Trained on margin subset"],
+                prop={"size": 25})
     if zoom !=None:
         ax1.set_ylim(zoom)
     
@@ -256,52 +269,52 @@ def plot_experiment(data, train_set_size=None, zoom=None, name=None, save=False)
     plt.show()
     return
 
-def plot_experiment_merged(datas, train_set_size=None, zoom=None, name=None, save=False):
-
-    data = datas[0]
-    data_to_add = datas[1]
-
-    if len(data) == 6:
-        train_set_size = data[5]
-    nb_to_del_table = data[0] / train_set_size
-    scores_regular_all = np.array(cut_list(data[1]))
-    scores_screened_all = np.array(cut_list(data[2]))
-    scores_r_all = np.array(cut_list(data[3]))
-    scores_screened_to_add_all = np.array(cut_list(data_to_add[2]))
-    safe_fraction = data[4] / train_set_size
-
-    scores_regular_mean = np.mean(scores_regular_all, 0)
-    scores_screened_mean = np.mean(scores_screened_all, 0)
-    scores_r_mean = np.mean(scores_r_all, 0)
-    scores_regular_to_add_mean = np.mean(scores_screened_to_add_all, 0)
-    
-    scores_regular_var = np.sqrt(np.var(scores_regular_all, 0))
-    scores_screened_var = np.sqrt(np.var(scores_screened_all, 0))
-    scores_r_var = np.sqrt(np.var(scores_r_all, 0))
-    scores_regular_to_add_var = np.sqrt(np.var(scores_screened_to_add_all, 0))
+def plot_experiment_simultaneous(datas, param_name, param_values, train_set_size=None, classification=True,
+                                 zoom=None):
 
     fig, ax1 = plt.subplots(figsize=(14, 8))
+    my_axes = []
 
+    for data in datas:
+        if len(data) == 6:
+            train_set_size = data[5]
+        nb_to_del_table = data[0] / train_set_size
+        scores_regular_all = np.array(cut_list(data[1]))
+        scores_screened_all = np.array(cut_list(data[2]))
+        scores_r_all = np.array(cut_list(data[3]))
+        safe_fraction = data[4] / train_set_size
+        
+        scores_regular_mean = np.mean(scores_regular_all, 0)
+        scores_screened_mean = np.mean(scores_screened_all, 0)
+        scores_r_mean = np.mean(scores_r_all, 0)
+
+        scores_regular_var = np.sqrt(np.var(scores_regular_all, 0))
+        scores_screened_var = np.sqrt(np.var(scores_screened_all, 0))
+        scores_r_var = np.sqrt(np.var(scores_r_all, 0))
+        my_axes.append(ax1.errorbar(nb_to_del_table[:len(scores_screened_mean)], scores_screened_mean, yerr=scores_screened_var, linewidth=5, capsize=10, 
+                     markeredgewidth=5))
+    
+    for k, my_axe in enumerate(my_axes):
+        ax1.legend(my_axe, "Trained on screened dataset ({} = {})".format(param_name, param_values[k]), prop={"size": 25})
+   
     a = ax1.errorbar(nb_to_del_table[:len(scores_regular_mean)], scores_regular_mean, yerr=scores_regular_var, linewidth=5, capsize=10, 
                      markeredgewidth=5)
-    b = ax1.errorbar(nb_to_del_table[:len(scores_regular_mean)], scores_screened_mean, yerr=scores_screened_var, linewidth=5, capsize=10, 
-                     markeredgewidth=5, color='orange')
-    c = ax1.errorbar(nb_to_del_table[:len(scores_regular_mean)], scores_r_mean, yerr=scores_r_var, linewidth=5, capsize=10, markeredgewidth=5, 
+    b = ax1.errorbar(nb_to_del_table[:len(scores_regular_mean)], scores_r_mean, yerr=scores_r_var, linewidth=5, capsize=10, markeredgewidth=5, 
                      color='mediumseagreen')
-    d = ax1.errorbar(nb_to_del_table[:len(scores_regular_mean)], scores_regular_to_add_mean, yerr=scores_regular_to_add_var, linewidth=5, capsize=10, 
-                     markeredgewidth=5)
-    ax1.legend([a, b, c, d], ["Trained on whole dataset", "Trained on screened dataset", "Trained on random subset", "Trained on screened dataset (no margin)"],
+    ax1.legend([a, b], ["Trained on whole dataset", "Trained on random subset"],
                 prop={"size": 25})
     
     if zoom !=None:
         ax1.set_ylim(zoom)
     
     ax1.set_xlabel('Fraction of points deleted (SAFE until {})'.format(safe_fraction), fontsize=45)
-    ax1.set_ylabel('Score on test set', fontsize=45)
+    if classification:
+        ax1.set_ylabel('Accuracy on test set', fontsize=45)
+    else:
+        ax1.set_ylabel('R^2 score on test set', fontsize=45)
     ax1.tick_params('y', labelsize=30)
     ax1.tick_params('x', labelsize=30)
     fig.tight_layout()
-    #ax1.legend()
     plt.show()
     return
 

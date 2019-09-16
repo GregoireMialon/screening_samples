@@ -1,0 +1,10 @@
+screening/datasets
+screening/pyaptlogs
+screening/results
+screening/logs
+screening/cluster_script
+screening/log.txt
+.*
+*.lprof
+__pycache__
+

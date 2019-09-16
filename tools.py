@@ -8,6 +8,7 @@ from scipy.sparse import rand
 from scipy.special import gamma
 from sklearn.utils import shuffle
 import matplotlib.pyplot as plt
+import argparse
 
 
 def make_data(n, p, sparsity, noise=True, save=False):
@@ -33,8 +34,8 @@ def make_data(n, p, sparsity, noise=True, save=False):
             y[i] += w
             noise_norm += (np.linalg.norm(w)) ** 2
     if save:
-        np.save('datasets/synthetic_X', X)
-        np.save('datasets/synthetic_y', y)
+        np.save('datasets/synthetic_X_n_{}_p_{}_s_{}'.format(n, p, sparsity), X)
+        np.save('datasets/synthetic_y_n_{}_p_{}_s_{}'.format(n, p, sparsity), y)
     return X, y, true_params, np.sqrt(noise_norm)
 
 
@@ -319,7 +320,12 @@ def plot_experiment_simultaneous(datas, param_name, param_values, train_set_size
     return
 
 if __name__ == "__main__":
-    
-    make_data(100, 500, 10 / 500, noise=True, save=True)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--n_samples', default=100, type=int)
+    parser.add_argument('--dimension', default=500, type=int)
+    parser.add_argument('--sparsity', default=10/500, type=float)
+    args = parser.parse_args()
+
+    make_data(args.n_samples, args.dimension, args.sparsity, noise=True, save=True)
         
 

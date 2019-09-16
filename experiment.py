@@ -1,6 +1,5 @@
 import numpy as np
 import argparse
-import pandas as pd
 from sklearn.model_selection import train_test_split
 from tools import (
     make_data, make_redundant_data, make_redundant_data_classification, 
@@ -12,99 +11,16 @@ from screening import (
     rank_dataset_accelerated,
     rank_dataset
 )
-from sklearn.datasets import load_diabetes, load_boston, fetch_20newsgroups
-from sklearn.feature_extraction.text import TfidfVectorizer
+from loaders import load_experiment
+from safelog import SafeLogistic
 from sklearn.svm import LinearSVC
 from sklearn.linear_model import Lasso
 from sklearn.utils import shuffle
 from sklearn.preprocessing import StandardScaler
 import random
-import scipy.io
-import pickle
 import os
 
-def load_leukemia(path):
-    data = pd.read_csv(path + 'leukemia_big.csv')
-    X = np.transpose(data.values)
-    y_ = data.columns.values
-    y = np.ones(len(y_))
-    for i in range(len(y_)):
-        if 'AML' in y_[i]:
-            y[i] = -1
-    return X, y
-
-def load_20newsgroups():
-    cats = ['comp.graphics','talk.religion.misc']
-    newsgroups_train = fetch_20newsgroups(subset='train', categories=cats)
-    X = newsgroups_train.data
-    y = newsgroups_train.target
-    vectorizer = TfidfVectorizer(stop_words='english', max_df=0.95, min_df=2)
-    X = vectorizer.fit_transform(X).toarray()
-    y = 2 * y - np.ones(len(y))
-    return X, y
-
-def load_mnist(path, pb=1):
-    mat = scipy.io.loadmat(path + 'ckn_mnist.mat')
-    X = mat['psiTr'].T
-    print('Shape of original MNIST', X.shape)
-    y = mat['Ytr']
-    y = np.array(y, dtype=int).reshape(y.shape[0])
-    for i in range(len(y)):
-        if y[i] != 9:
-            y[i] = - 1
-        else:
-            y[i] = 1
-    #X, y = balanced_subsample(X, y)
-    return X, y
-
-def load_higgs(path):
-    dir_higgs = path + 'higgs.small.p'
-    with open(dir_higgs, 'rb') as handle:
-        data_higgs = pickle.load(handle)
-    X = data_higgs[0]
-    y =data_higgs[1]
-    return X, y
-
-def load_synthetic(path):
-    X = np.load(path + 'synthetic_X.npy')
-    y = np.load(path + 'synthetic_y.npy') 
-    return X, y
-
-def load_experiment(dataset, synth_params, size, redundant, noise, classification, path):
-    if dataset == 'leukemia':
-        X, y = load_leukemia(path)
-    elif dataset == 'boston':
-        boston = load_boston(return_X_y=True)
-        X = boston[0]
-        y = boston[1]
-    elif dataset == 'diabetes':
-        diabetes = load_diabetes(return_X_y=True)
-        X = diabetes[0]
-        y = diabetes[1]
-    elif dataset == '20newsgroups':
-        X, y = load_20newsgroups()
-    elif dataset == 'mnist':
-        X, y = load_mnist(path)
-    elif dataset == 'higgs':
-        X, y = load_higgs(path)
-    elif dataset == 'synthetic':
-        X, y, _, _ = make_data(synth_params[0], synth_params[1], synth_params[2]) #old params: 100, 2, 0.5
-        #print('TRUE SYNTHETIC PARAMETERS', true_params)
-    elif dataset == 'fixed_synthetic':
-        X, y = load_synthetic(path)
-    if redundant != 0 and not(classification):
-        dataset+= '_redundant'
-        X, y = make_redundant_data(X, y, int(redundant), noise)
-    elif redundant != 0 and classification:
-        dataset+= '_redundant'
-        X, y = make_redundant_data_classification(X, y, int(redundant))
-
-    if size != None:
-        X = X[:int(size)]
-        y = y[:int(size)]
-    return X, y
-
-def fit_estimator(X, y, loss, penalty, lmbda, intercept, max_iter=10000):
+def fit_estimator(X, y, loss, penalty, mu, lmbda, intercept, max_iter=10000):
     if loss == 'truncated_squared' and penalty == 'l1':
         estimator = Lasso(alpha=lmbda, fit_intercept=intercept, 
                         max_iter=max_iter).fit(X, y)
@@ -116,9 +32,11 @@ def fit_estimator(X, y, loss, penalty, lmbda, intercept, max_iter=10000):
                         max_iter=max_iter).fit(X, y)
     elif loss == 'squared_hinge' and penalty == 'l2':
         estimator = LinearSVC(C= 1 / lmbda, loss=loss, dual=False, penalty=penalty, fit_intercept=intercept, 
-                        max_iter=max_iter).fit(X, y)               
+                        max_iter=max_iter).fit(X, y) 
+    elif loss == 'safe_logistic' and penalty == 'l2':
+        estimator = SafeLogistic(mu=mu, lmbda=lmbda, max_iter=max_iter).fit(X, y)            
     else:
-    	print('ERROR, you can only combine squared loss with l1 and hinge with l2 for now.')
+    	print('ERROR, you picked a combination which is not implemented.')
     return estimator
 
 def experiment_get_ellipsoid(X, y, intercept, better_init, better_radius, loss, penalty, 
@@ -130,7 +48,7 @@ def experiment_get_ellipsoid(X, y, intercept, better_init, better_radius, loss, 
         z_init = np.zeros(X.shape[1])
         r_init = X.shape[1]
     if better_init != 0:
-        est = fit_estimator(X, y, loss, penalty, lmbda, intercept, max_iter=better_init)
+        est = fit_estimator(X, y, loss, penalty, mu, lmbda, intercept, max_iter=better_init)
         if classification:
             z_init = est.coef_[0]
             if intercept:
@@ -237,7 +155,7 @@ def experiment(path, dataset, synth_params, size, scale_data, redundant, noise, 
             compt = 0
             X_screened, y_screened = screen(X_train, y_train, scores, nb_to_delete)
             X_r, y_r = random_screening(X_r, y_r, X_train.shape[0] - nb_to_delete)
-            #model = fit_estimator(X_train, y_train, loss, penalty, lmbda, intercept, max_iter=10)
+            #model = fit_estimator(X_train, y_train, loss, penalty, mu, lmbda, intercept, max_iter=10)
             #X_margin, y_margin = screen_baseline_margin(X_train, y_train, model, nb_to_delete)
             if not(dataset_has_both_labels(y_r)):
                 print('Warning, only one label in randomly screened dataset')
@@ -250,11 +168,11 @@ def experiment(path, dataset, synth_params, size, scale_data, redundant, noise, 
             print(X_train.shape, X_screened.shape, X_r.shape) #, X_margin.shape)
             while compt < nb_test:
                 compt += 1
-                estimator_regular = fit_estimator(X_train, y_train, loss, penalty, lmbda, intercept)
-                estimator_screened = fit_estimator(X_screened, y_screened, loss, penalty, lmbda, 
+                estimator_regular = fit_estimator(X_train, y_train, loss, penalty, mu, lmbda, intercept)
+                estimator_screened = fit_estimator(X_screened, y_screened, loss, penalty, mu, lmbda, 
                 intercept)
-                estimator_r = fit_estimator(X_r, y_r, loss, penalty, lmbda, intercept)
-                #estimator_margin = fit_estimator(X_margin, y_margin, loss, penalty, lmbda, intercept)
+                estimator_r = fit_estimator(X_r, y_r, loss, penalty, mu, lmbda, intercept)
+                #estimator_margin = fit_estimator(X_margin, y_margin, loss, penalty, mu, lmbda, intercept)
                 if classif_score:
                     score_regular += scoring_classif(estimator_regular, X_test, y_test)
                     score_screened += scoring_classif(estimator_screened, X_test, y_test)
@@ -278,7 +196,7 @@ def experiment(path, dataset, synth_params, size, scale_data, redundant, noise, 
     print('Number of datapoints we can screen (if safe rules apply to the experiment):', idx_safe_all / nb_exp)
 
     data = (nb_to_del_table, scores_regular_all, scores_screened_all, scores_r_all, 
-        np.floor(idx_safe / nb_exp), X_train.shape[0]) #, scores_margin_all)
+        idx_safe_all / nb_exp, X_train.shape[0]) #, scores_margin_all)
     save_dataset_folder = os.path.join(path, 'results', dataset)
     os.makedirs(save_dataset_folder, exist_ok=True)
     if not dontsave:
@@ -363,7 +281,7 @@ def experiment_(path, dataset, synth_params, size, scale_data, redundant, noise,
             print(X_train[idx_to_del[nb_to_delete:]].shape)
             while compt < nb_test:
                 compt += 1
-                estimator = fit_estimator(X_train[idx_to_del[nb_to_delete:]], y_train[idx_to_del[nb_to_delete:]], loss, penalty, lmbda, intercept)
+                estimator = fit_estimator(X_train[idx_to_del[nb_to_delete:]], y_train[idx_to_del[nb_to_delete:]], loss, penalty, mu, lmbda, intercept)
                 if classif_score:
                     score += scoring_classif(estimator, X_test, y_test)
                 else:
@@ -373,7 +291,7 @@ def experiment_(path, dataset, synth_params, size, scale_data, redundant, noise,
 
     print('Number of datapoints we can screen (if safe rules apply to the experiment):', idx_safe_all / nb_exp)
 
-    data = (nb_to_del_table, scores_all, np.floor(idx_safe / nb_exp), X_train.shape[0])
+    data = (nb_to_del_table, scores_all, idx_safe_all / nb_exp, X_train.shape[0])
     save_dataset_folder = os.path.join(path, 'results', dataset)
     os.makedirs(save_dataset_folder, exist_ok=True)
     if not dontsave:
@@ -395,7 +313,7 @@ if __name__ == '__main__':
     parser.add_argument('--lmbda', default=0.01, type=float, help='regularization parameter of the estimator')
     parser.add_argument('--mu', default=10, type=float, help='regularization parameter of the dual')
     parser.add_argument('--classification', action='store_true')
-    parser.add_argument('--loss', default='truncated_squared', choices=['hinge', 'squared_hinge', 'squared','truncated_squared'])
+    parser.add_argument('--loss', default='truncated_squared', choices=['hinge', 'squared_hinge', 'squared','truncated_squared', 'safe_logistic'])
     parser.add_argument('--penalty', default='l1', choices=['l1','l2'])
     parser.add_argument('--intercept', action='store_true')
     parser.add_argument('--classif_score', action='store_true', help='determines the score that is used')

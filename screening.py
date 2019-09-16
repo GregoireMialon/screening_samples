@@ -25,12 +25,14 @@ def compute_hinge_subgradient(u, mu):
             g[i] = np.random.rand(1)[0] - 1
     return g
 
+
 def compute_squared_hinge_subgradient(u, mu):
     g = np.zeros(u.size)
     for i in range(u.size):
         if u[i] < mu:
             g[i] = -2 * (mu - u[i])
     return g
+
 
 def compute_l1_subgradient(u):
     g = np.zeros(u.size)
@@ -39,6 +41,15 @@ def compute_l1_subgradient(u):
             g[i] = np.sign(u[i])
         else:
             g[i] = 2 * np.random.rand(1)[0] - 1
+    return g
+
+
+def compute_safe_logistic_gradient(u, mu):
+    threshold = 1 - mu
+    g = np.zeros(u.size)
+    for i in range(u.size):
+        if u[i] < 1 - threshold:
+            g[i] = np.exp(u[i] + threshold - 1) - 1
     return g
 
 
@@ -58,6 +69,10 @@ def compute_subgradient(x, D, y, lmbda, mu, loss, penalty, intercept):
         output = y * D.dot(x)
         g_1 = compute_squared_hinge_subgradient(output, mu)
         g_1 = (np.transpose(D).dot(y * g_1))
+    elif loss == 'safe_logistic':
+        output = y * D.dot(x)
+        g_1 = compute_safe_logistic_gradient(output, mu)
+        g_1 = (1 / D.shape[0]) * (np.transpose(D).dot(y * g_1))
     if penalty == 'l2':
         g_2 = np.copy(x)
         if intercept:

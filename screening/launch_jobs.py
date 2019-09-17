@@ -1,17 +1,17 @@
 import datetime
 import itertools
 import os
-
-import pyapt
 import numpy as np
+from screening.pyapt import apt_run
+from screening.settings import LOGS_PATH
 
 
-mus = [0, 0.001, 0.01, 0.1, 1.0, 10.0]
-lmbdas = [0.0001, 0.001, 0.01, 0.1, 1.0]
-n_ellipsoid_stepss = [1, 10, 50]
-better_inits = [0, 1, 10, 100]
+mus = [0.2] #, 0.001, 0.01, 0.1, 1.0, 10.0]
+lmbdas = [0.0001] #, 0.001, 0.01, 0.1, 1.0]
+n_ellipsoid_stepss = [1] #, 10, 50]
+better_inits = [0] #, 1, 10, 100]
 better_radiuss = [0, 1, 10, 100]
-sizes = [100]
+sizes = [10]
 
 parallel_args = []
 for (mu, lmbda, n_ellipsoid_steps, better_init, better_radius, size) in itertools.product(
@@ -38,7 +38,7 @@ for (mu, lmbda, n_ellipsoid_steps, better_init, better_radius, size) in itertool
 
 
 
-cd_project_folder = 'cd /sequoia/data1/gmialon/screening'
+cd_project_folder = os.path.join('cd ', LOGS_PATH)
 conda_activate = 'conda activate yana'
 conda_var = ('CONDA_PREFIX',
 	 '/sequoia/data1/gmialon/miniconda/envs/yana')
@@ -47,8 +47,8 @@ shell_vars = [conda_var, paths]
 prepend_cmd = ['source ~/.bashrc', cd_project_folder, conda_activate, 'which python']
 
 queues = ['all.q', 'bigmem.q', 'goodboy.q']
-python_cmd = 'experiment.py'
-pyapt.apt_run(
+python_cmd = '-m screening.experiment'
+apt_run(
         python_cmd,
         parallel_args=parallel_args,
         queues=queues,

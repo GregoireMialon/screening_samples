@@ -9,7 +9,7 @@ from subprocess import call
 DEFAULT_QUEUES = [
     'gaia.q', 'titan.q', 'zeus.q', 'chronos.q', 'all.q', 'bigmem.q', 'gpu.q'
 ]
-DEFAULT_TMP_DIR = '/sequoia/data1/gmialon/screening/pyaptlogs'
+DEFAULT_TMP_DIR = '/sequoia/data1/gmialon/pyaptlogs'
 MAX_JOBS = 100
 
 

@@ -4,13 +4,15 @@ from sklearn.datasets import load_diabetes, load_boston, fetch_20newsgroups
 from sklearn.feature_extraction.text import TfidfVectorizer
 from scipy.io import loadmat
 import pickle
-from tools import (
+from screening.tools import (
     make_data, make_redundant_data, 
     make_redundant_data_classification
 )
+from screening.settings import DATASETS_PATH
 
-def load_leukemia(path):
-    data = pd.read_csv(path + 'leukemia_big.csv')
+
+def load_leukemia():
+    data = pd.read_csv(DATASETS_PATH + 'leukemia_big.csv')
     X = np.transpose(data.values)
     y_ = data.columns.values
     y = np.ones(len(y_))
@@ -29,8 +31,8 @@ def load_20newsgroups():
     y = 2 * y - np.ones(len(y))
     return X, y
 
-def load_mnist(path, pb=1):
-    mat = loadmat(path + 'ckn_mnist.mat')
+def load_mnist(pb=1):
+    mat = loadmat(DATASETS_PATH + 'ckn_mnist.mat')
     X = mat['psiTr'].T
     print('Shape of original MNIST', X.shape)
     y = mat['Ytr']
@@ -43,22 +45,22 @@ def load_mnist(path, pb=1):
     #X, y = balanced_subsample(X, y)
     return X, y
 
-def load_higgs(path):
-    dir_higgs = path + 'higgs'
+def load_higgs():
+    dir_higgs = DATASETS_PATH + 'higgs'
     with open(dir_higgs, 'rb') as handle:
         data_higgs = pickle.load(handle)
     X = data_higgs[0]
     y =data_higgs[1]
     return X, y
 
-def load_synthetic(path, extension):
-    X = np.load(path + 'synthetic_X' + extension + '.npy')
-    y = np.load(path + 'synthetic_y' + extension + '.npy') 
+def load_synthetic(extension):
+    X = np.load(DATASETS_PATH + 'synthetic_X' + extension + '.npy')
+    y = np.load(DATASETS_PATH + 'synthetic_y' + extension + '.npy') 
     return X, y
 
-def load_experiment(dataset, synth_params, size, redundant, noise, classification, path):
+def load_experiment(dataset, synth_params, size, redundant, noise, classification):
     if dataset == 'leukemia':
-        X, y = load_leukemia(path)
+        X, y = load_leukemia()
     elif dataset == 'boston':
         boston = load_boston(return_X_y=True)
         X = boston[0]
@@ -70,15 +72,15 @@ def load_experiment(dataset, synth_params, size, redundant, noise, classificatio
     elif dataset == '20newsgroups':
         X, y = load_20newsgroups()
     elif dataset == 'mnist':
-        X, y = load_mnist(path)
+        X, y = load_mnist()
     elif dataset == 'higgs':
-        X, y = load_higgs(path)
+        X, y = load_higgs()
     elif dataset == 'synthetic':
         X, y, _, _ = make_data(synth_params[0], synth_params[1], synth_params[2]) #old params: 100, 2, 0.5
         #print('TRUE SYNTHETIC PARAMETERS', true_params)
     elif 'fixed_synthetic' in dataset:
         extension = dataset.replace('fixed_synthetic','')
-        X, y = load_synthetic(path, extension)
+        X, y = load_synthetic(extension)
     if redundant != 0 and not(classification):
         dataset+= '_redundant'
         X, y = make_redundant_data(X, y, int(redundant), noise)

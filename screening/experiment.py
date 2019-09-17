@@ -1,22 +1,23 @@
 import numpy as np
 import argparse
 from sklearn.model_selection import train_test_split
-from tools import (
+from screening.tools import (
     make_data, make_redundant_data, make_redundant_data_classification, 
     balanced_subsample, random_screening, dataset_has_both_labels, screen, get_idx_safe, 
     scoring_classif, plot_experiment, screen_baseline_margin
 )
-from screening import (
+from screening.screening import (
     iterate_ellipsoids_accelerated,
     rank_dataset_accelerated,
     rank_dataset
 )
-from loaders import load_experiment
-from safelog import SafeLogistic
+from screening.loaders import load_experiment
+from screening.safelog import SafeLogistic
 from sklearn.svm import LinearSVC
 from sklearn.linear_model import Lasso
 from sklearn.utils import shuffle
 from sklearn.preprocessing import StandardScaler
+from screening.settings import RESULTS_PATH
 import random
 import os
 
@@ -63,24 +64,8 @@ def experiment_get_ellipsoid(X, y, intercept, better_init, better_radius, loss, 
                                 r_init, lmbda, mu, loss, penalty, n_ellipsoid_steps, intercept)
     return z, scaling, L, I_k_vec, g, r_init
 
-def run_experiment(X_train, y_train, model, experiment, intercept, loss, penalty, lmbda, classification, 
-                    mu, n_ellipsoid_steps, better_init, better_radius, cut, get_ell_from_subset, clip_ell):
-    if experiment == 'whole':
-        idx_to_del = []
-    elif experiment == 'random':
-        idx_to_del = []
-    elif experiment == 'screen':
-        scores = ellipsoid_screening(X_train, y_train, intercept, loss, penalty, lmbda, classification, mu, n_ellipsoid_steps, 
-                        better_init, better_radius, cut, get_ell_from_subset, clip_ell)
-        idx_to_del = [scores]
-    elif experiment == 'margin':
-        idx_to_del = []
-    else:
-        print('ERROR, experiment not implemented')
-    return idx_to_del
-
 #@profile
-def experiment(path, dataset, synth_params, size, scale_data, redundant, noise, nb_delete_steps, lmbda, mu, classification, 
+def experiment(dataset, synth_params, size, scale_data, redundant, noise, nb_delete_steps, lmbda, mu, classification, 
                 loss, penalty, intercept, classif_score, n_ellipsoid_steps, better_init, 
                 better_radius, cut, get_ell_from_subset, clip_ell, nb_exp, nb_test, plot, zoom, 
                 dontsave):
@@ -89,7 +74,7 @@ def experiment(path, dataset, synth_params, size, scale_data, redundant, noise, 
         better_radius, cut, clip_ell)
     print(exp_title)
 
-    X, y = load_experiment(dataset, synth_params, size, redundant, noise, classification, path + 'datasets/')
+    X, y = load_experiment(dataset, synth_params, size, redundant, noise, classification)
 
     scores_regular_all = []
     scores_screened_all = []
@@ -197,7 +182,7 @@ def experiment(path, dataset, synth_params, size, scale_data, redundant, noise, 
 
     data = (nb_to_del_table, scores_regular_all, scores_screened_all, scores_r_all, 
         idx_safe_all / nb_exp, X_train.shape[0]) #, scores_margin_all)
-    save_dataset_folder = os.path.join(path, 'results', dataset)
+    save_dataset_folder = os.path.join(RESULTS_PATH, dataset)
     os.makedirs(save_dataset_folder, exist_ok=True)
     if not dontsave:
         np.save(os.path.join(save_dataset_folder, exp_title), data)
@@ -208,101 +193,8 @@ def experiment(path, dataset, synth_params, size, scale_data, redundant, noise, 
     
     return
 
-def ellipsoid_screening(X_train, y_train, intercept, loss, penalty, lmbda, classification, mu, n_ellipsoid_steps, 
-                        better_init, better_radius, cut, get_ell_from_subset, clip_ell):
-    if get_ell_from_subset != 0:
-        X_train_, y_train_ = balanced_subsample(X_train, y_train)
-        X_train_, y_train_ = shuffle(X_train_, y_train_)
-        if get_ell_from_subset < X_train_.shape[0]:
-            X_train_ = X_train_[:get_ell_from_subset]
-            y_train_ = y_train_[:get_ell_from_subset]
-        z, scaling, L, I_k_vec, g, r_init = experiment_get_ellipsoid(X_train_, y_train_, intercept, better_init, 
-                                                        better_radius, loss, penalty, lmbda, 
-                                                        classification, mu, n_ellipsoid_steps)
-    else:
-        z, scaling, L, I_k_vec, g, r_init = experiment_get_ellipsoid(X_train, y_train, intercept, better_init, 
-                                                            better_radius, loss, penalty, lmbda, 
-                                                            classification, mu, n_ellipsoid_steps)
-    if clip_ell:
-        I_k_vec = I_k_vec.reshape(-1,1)
-        A = scaling * np.identity(X_train.shape[1]) - L.dot(np.multiply(I_k_vec, np.transpose(L)))
-        eigenvals, eigenvect = np.linalg.eigh(A)
-        eigenvals = np.clip(eigenvals, 0, r_init)
-        eigenvals = eigenvals.reshape(-1,1)
-        A = eigenvect.dot(np.multiply(eigenvals, np.transpose(eigenvect)))
-        scores = rank_dataset(X_train, y_train, z, A, g,
-                                        lmbda, mu, classification, loss, penalty, intercept, cut)
-    else:                            
-        scores = rank_dataset_accelerated(X_train, y_train, z, scaling, L, I_k_vec, g,
-                                        lmbda, mu, classification, loss, penalty, intercept, cut)
-    return scores
-
-def experiment_(path, dataset, synth_params, size, scale_data, redundant, noise, nb_delete_steps, lmbda, mu, classification, 
-            loss, penalty, intercept, classif_score, baseline, n_ellipsoid_steps, better_init, 
-            better_radius, cut, get_ell_from_subset, clip_ell, nb_exp, nb_test, 
-            dontsave):
-    exp_title = 'X_size_{}_baseline_{}_loss_{}_lmbda_{}_n_ellipsoid_{}_intercept_{}_mu_{}_redundant_{}_noise_{}_better_init_{}_better_radius_{}_cut_ell_{}_clip_ell_{}'.format(size, 
-        baseline, loss, lmbda, n_ellipsoid_steps, intercept, mu, redundant, noise, better_init, 
-        better_radius, cut, clip_ell)
-    print(exp_title)
-
-    X, y = load_experiment(dataset, synth_params, size, redundant, noise, classification, path + 'datasets/')
-    scores_all = []
-    compt_exp = 0
-    idx_safe_all = 0
-
-    while compt_exp < nb_exp:
-        random.seed(compt_exp)
-        np.random.seed(compt_exp)
-        compt_exp += 1
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
-        if scale_data:
-            scaler = StandardScaler()
-            X_train = scaler.fit_transform(X_train)
-            X_test = scaler.transform(X_test)
-        
-        if experiment == 'screen':
-            scores = []
-            idx_safe = get_idx_safe(scores, mu, classification)
-            idx_safe_all += idx_safe
-            idx_to_del = []    
-        else:
-            model = [] #TODO
-            idx_to_del = run_experiment(X_train, y_train, model, experiment, intercept, loss, penalty, lmbda, classification, 
-                    mu, n_ellipsoid_steps, better_init, better_radius, cut, get_ell_from_subset, clip_ell)
-
-        nb_to_del_table = np.linspace(1, X_train.shape[0], nb_delete_steps, dtype='int')
-        for nb_to_delete in nb_to_del_table:
-            score = 0
-            compt = 0
-            if not(dataset_has_both_labels(y_train[idx_to_del[nb_to_delete:]])):
-                print('Warning, only one label in {} dataset'.format(baseline))
-                break
-            print(X_train[idx_to_del[nb_to_delete:]].shape)
-            while compt < nb_test:
-                compt += 1
-                estimator = fit_estimator(X_train[idx_to_del[nb_to_delete:]], y_train[idx_to_del[nb_to_delete:]], loss, penalty, mu, lmbda, intercept)
-                if classif_score:
-                    score += scoring_classif(estimator, X_test, y_test)
-                else:
-                    score += estimator.score(X_test, y_test)
-            scores.append(score / nb_test)
-        scores_all.append(scores)
-
-    print('Number of datapoints we can screen (if safe rules apply to the experiment):', idx_safe_all / nb_exp)
-
-    data = (nb_to_del_table, scores_all, idx_safe_all / nb_exp, X_train.shape[0])
-    save_dataset_folder = os.path.join(path, 'results', dataset)
-    os.makedirs(save_dataset_folder, exist_ok=True)
-    if not dontsave:
-        np.save(os.path.join(save_dataset_folder, exp_title), data)
-        print('RESULTS SAVED!')
-
-    return
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--path', default='./', type=str)
     parser.add_argument('--dataset', default='diabetes', help='dataset used for the experiment')
     parser.add_argument('--synth_params', default=[100, 500, 10 / 500], nargs='+', type=float, help='in order: nb_samples, dimension, sparsity')
     parser.add_argument('--size', default=442, type=int, help='number of samples of the dataset to use')
@@ -332,7 +224,7 @@ if __name__ == '__main__':
 
     print('START')
 
-    experiment(args.path, args.dataset, args.synth_params, args.size, args.scale_data, args.redundant, args.noise, args.nb_delete_steps, 
+    experiment(args.dataset, args.synth_params, args.size, args.scale_data, args.redundant, args.noise, args.nb_delete_steps, 
         args.lmbda, args.mu, 
         args.classification, args.loss, args.penalty, args.intercept, args.classif_score, 
         args.n_ellipsoid_steps, args.better_init, args.better_radius, args.cut_ell, 

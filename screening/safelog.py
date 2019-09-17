@@ -1,8 +1,8 @@
 from scipy.optimize import fmin_l_bfgs_b
 import numpy as np
-from tools import scoring_classif
+from screening.tools import scoring_classif
 from sklearn.model_selection import train_test_split
-from loaders import load_experiment
+from screening.loaders import load_experiment
 
 class SafeLogistic:
 

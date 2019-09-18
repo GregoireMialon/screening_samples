@@ -7,7 +7,7 @@ from screening.settings import LOGS_PATH
 
 
 mus = [0.1, 0.5, 1]
-lmbdas = [0, 0.0001, 0.001] #0.01, 0.1, 1, 10] 
+lmbdas = [0.0001, 0.001] #0 0.01, 0.1, 1, 10] 
 n_ellipsoid_stepss = [10, 100, 1000, 10000]
 better_inits = [0, 1, 10, 100]
 better_radiuss = [0, 10, 100, 1000]
@@ -27,9 +27,9 @@ for (mu, lmbda, n_ellipsoid_steps, better_init, better_radius, size, sub_ell) in
 		'penalty': 'l2',
 		'nb_delete_steps': 10,
 		'nb_exp': 3,
-		'nb_test': 3,
+		'nb_test': 2,
 		'classif_score': True,
-		'loss': 'safe_logistic',
+		'loss': 'logistic',
 		'classification': True,
 		'better_init': better_init,
 		'better_radius': better_radius,

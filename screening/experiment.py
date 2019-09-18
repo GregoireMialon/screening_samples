@@ -14,7 +14,7 @@ from screening.screening import (
 from screening.loaders import load_experiment
 from screening.safelog import SafeLogistic
 from sklearn.svm import LinearSVC
-from sklearn.linear_model import Lasso
+from sklearn.linear_model import Lasso, LogisticRegression
 from sklearn.utils import shuffle
 from sklearn.preprocessing import StandardScaler
 from screening.settings import RESULTS_PATH
@@ -35,7 +35,9 @@ def fit_estimator(X, y, loss, penalty, mu, lmbda, intercept, max_iter=10000):
         estimator = LinearSVC(C= 1 / lmbda, loss=loss, dual=False, penalty=penalty, fit_intercept=intercept, 
                         max_iter=max_iter).fit(X, y) 
     elif loss == 'safe_logistic' and penalty == 'l2':
-        estimator = SafeLogistic(mu=mu, lmbda=lmbda, max_iter=max_iter).fit(X, y)            
+        estimator = SafeLogistic(mu=mu, lmbda=lmbda, max_iter=max_iter).fit(X, y)
+    elif loss == 'logistic' and penalty == 'l2':
+        estimator = LogisticRegression(C=1/lmbda, fit_intercept=intercept).fit(X, y)            
     else:
     	print('ERROR, you picked a combination which is not implemented.')
     return estimator
@@ -205,7 +207,7 @@ if __name__ == '__main__':
     parser.add_argument('--lmbda', default=0.01, type=float, help='regularization parameter of the estimator')
     parser.add_argument('--mu', default=10, type=float, help='regularization parameter of the dual')
     parser.add_argument('--classification', action='store_true')
-    parser.add_argument('--loss', default='truncated_squared', choices=['hinge', 'squared_hinge', 'squared','truncated_squared', 'safe_logistic'])
+    parser.add_argument('--loss', default='truncated_squared', choices=['hinge', 'squared_hinge', 'squared','truncated_squared', 'safe_logistic', 'logistic'])
     parser.add_argument('--penalty', default='l1', choices=['l1','l2'])
     parser.add_argument('--intercept', action='store_true')
     parser.add_argument('--classif_score', action='store_true', help='determines the score that is used')

@@ -69,7 +69,7 @@ def compute_subgradient(x, D, y, lmbda, mu, loss, penalty, intercept):
         output = y * D.dot(x)
         g_1 = compute_squared_hinge_subgradient(output, mu)
         g_1 = (np.transpose(D).dot(y * g_1))
-    elif loss == 'safe_logistic':
+    elif loss == 'safe_logistic' or loss == 'logistic':
         output = y * D.dot(x)
         g_1 = compute_safe_logistic_gradient(output, mu)
         g_1 = (1 / D.shape[0]) * (np.transpose(D).dot(y * g_1))

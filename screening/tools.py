@@ -178,9 +178,7 @@ def cut_list(my_list):
     return final_list
 
 
-def screen(X, y, scores, nb_to_delete):
-    #X_screened = X
-    #y_screened = y
+def order(X, y, scores, nb_to_delete):
     idx_to_delete = np.argsort(scores)[0:nb_to_delete]
     X_screened = np.delete(X, idx_to_delete, 0)
     y_screened = np.delete(y, idx_to_delete, 0)

@@ -5,6 +5,30 @@ from scipy.sparse import rand
 import random
 import time
 from sklearn.model_selection import train_test_split
+from screening.safelog import SafeLogistic
+from sklearn.svm import LinearSVC
+from sklearn.linear_model import Lasso, LogisticRegression
+
+def fit_estimator(X, y, loss, penalty, mu, lmbda, intercept, max_iter=10000):
+    if loss == 'truncated_squared' and penalty == 'l1':
+        estimator = Lasso(alpha=lmbda, fit_intercept=intercept, 
+                        max_iter=max_iter).fit(X, y)
+    elif loss == 'squared' and penalty == 'l1':
+        estimator = Lasso(alpha=lmbda, fit_intercept=intercept, 
+                        max_iter=max_iter).fit(X, y)
+    elif loss == 'hinge' and penalty == 'l2':
+        estimator = LinearSVC(C= 1 / lmbda, loss=loss, penalty=penalty, fit_intercept=intercept, 
+                        max_iter=max_iter).fit(X, y)
+    elif loss == 'squared_hinge' and penalty == 'l2':
+        estimator = LinearSVC(C= 1 / lmbda, loss=loss, dual=False, penalty=penalty, fit_intercept=intercept, 
+                        max_iter=max_iter).fit(X, y) 
+    elif loss == 'safe_logistic' and penalty == 'l2':
+        estimator = SafeLogistic(mu=mu, lmbda=lmbda, max_iter=max_iter).fit(X, y)
+    elif loss == 'logistic' and penalty == 'l2':
+        estimator = LogisticRegression(C=1/lmbda, fit_intercept=intercept).fit(X, y)            
+    else:
+    	print('ERROR, you picked a combination which is not implemented.')
+    return estimator
 
 
 def compute_truncated_squared_loss_gradient(u, mu):
@@ -202,8 +226,10 @@ def test_dataset_accelerated(D, y, lmbda, mu, classification, loss, penalty, n_s
     return results
 
 
-def rank_dataset_accelerated(D, y, z, scaling, L, I_k_vec, g, lmbda, mu, classification, 
-    loss, penalty, intercept, cut):
+def rank_dataset_accelerated(D, y, z, scaling, L, I_k_vec, g, mu, classification, intercept, cut):
+    '''
+    Gives score to each sample, do not re-order the dataset
+    '''
     if intercept:
         X = np.concatenate((D, np.ones(D.shape[0]).reshape(1,-1).T), axis=1)
     else:
@@ -230,10 +256,10 @@ def rank_dataset_accelerated(D, y, z, scaling, L, I_k_vec, g, lmbda, mu, classif
 
 
 def compute_test(D_i, y_i, z, A, g, classification, cut):
-    A_g = A.dot(g)
-    A_D_i = A.dot(D_i)
+    A_D_i = A.dot(D_i) 
     if classification:
         if cut:
+            A_g = A.dot(g)
             nu = - g.dot(A_D_i) / g.dot(A_g)
             if nu < 0:
                 test = D_i.dot(z) - np.sqrt(D_i.dot(A_D_i))
@@ -248,6 +274,7 @@ def compute_test(D_i, y_i, z, A, g, classification, cut):
         
     else:
         if cut:
+            A_g = A.dot(g)
             nu = g.dot(A_D_i) / g.dot(A_g)
             if nu < 0:
                 test = D_i.dot(z) + np.sqrt(D_i.dot(A_D_i)) - y_i
@@ -262,7 +289,7 @@ def compute_test(D_i, y_i, z, A, g, classification, cut):
     return test
 
 
-def rank_dataset(D, y, z, A, g, lmbda, mu, classification, loss, penalty, intercept, cut):
+def rank_dataset(D, y, z, A, g, mu, classification, intercept, cut):
     if intercept:
         X = np.concatenate((D, np.ones(D.shape[0]).reshape(1,-1).T), axis=1)
     else:

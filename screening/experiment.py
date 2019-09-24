@@ -3,68 +3,27 @@ import argparse
 from sklearn.model_selection import train_test_split
 from screening.tools import (
     make_data, make_redundant_data, make_redundant_data_classification, 
-    balanced_subsample, random_screening, dataset_has_both_labels, screen, get_idx_safe, 
+    balanced_subsample, random_screening, dataset_has_both_labels, order, get_idx_safe, 
     scoring_classif, plot_experiment, screen_baseline_margin
 )
-from screening.screening import (
+from screening.screentools import (
+    fit_estimator,
     iterate_ellipsoids_accelerated,
     rank_dataset_accelerated,
     rank_dataset
 )
+from screening.screenell import EllipsoidScreener
+from screening.screendg import DualityGapScreener
 from screening.loaders import load_experiment
 from screening.safelog import SafeLogistic
 from sklearn.svm import LinearSVC
+from lightning.classification import LinearSVC as LinearSVC_l
 from sklearn.linear_model import Lasso, LogisticRegression
 from sklearn.utils import shuffle
 from sklearn.preprocessing import StandardScaler
 from screening.settings import RESULTS_PATH
 import random
 import os
-
-def fit_estimator(X, y, loss, penalty, mu, lmbda, intercept, max_iter=10000):
-    if loss == 'truncated_squared' and penalty == 'l1':
-        estimator = Lasso(alpha=lmbda, fit_intercept=intercept, 
-                        max_iter=max_iter).fit(X, y)
-    elif loss == 'squared' and penalty == 'l1':
-        estimator = Lasso(alpha=lmbda, fit_intercept=intercept, 
-                        max_iter=max_iter).fit(X, y)
-    elif loss == 'hinge' and penalty == 'l2':
-        estimator = LinearSVC(C= 1 / lmbda, loss=loss, penalty=penalty, fit_intercept=intercept, 
-                        max_iter=max_iter).fit(X, y)
-    elif loss == 'squared_hinge' and penalty == 'l2':
-        estimator = LinearSVC(C= 1 / lmbda, loss=loss, dual=False, penalty=penalty, fit_intercept=intercept, 
-                        max_iter=max_iter).fit(X, y) 
-    elif loss == 'safe_logistic' and penalty == 'l2':
-        estimator = SafeLogistic(mu=mu, lmbda=lmbda, max_iter=max_iter).fit(X, y)
-    elif loss == 'logistic' and penalty == 'l2':
-        estimator = LogisticRegression(C=1/lmbda, fit_intercept=intercept).fit(X, y)            
-    else:
-    	print('ERROR, you picked a combination which is not implemented.')
-    return estimator
-
-def experiment_get_ellipsoid(X, y, intercept, better_init, better_radius, loss, penalty, 
-                                lmbda, classification, mu, n_ellipsoid_steps):
-    if intercept:
-        z_init = np.zeros(X.shape[1] + 1)
-        r_init = X.shape[1] + 1
-    else:
-        z_init = np.zeros(X.shape[1])
-        r_init = X.shape[1]
-    if better_init != 0:
-        est = fit_estimator(X, y, loss, penalty, mu, lmbda, intercept, max_iter=better_init)
-        if classification:
-            z_init = est.coef_[0]
-            if intercept:
-                z_init = np.append(z_init, est.intercept_)
-        else:
-            z_init = est.coef_
-            if intercept:
-                z_init = np.append(z_init, est.intercept_)
-    if better_radius != 0:
-        r_init = float(better_radius)                            
-    z, scaling, L, I_k_vec, g = iterate_ellipsoids_accelerated(X, y, z_init,
-                                r_init, lmbda, mu, loss, penalty, n_ellipsoid_steps, intercept)
-    return z, scaling, L, I_k_vec, g, r_init
 
 #@profile
 def experiment(dataset, synth_params, size, scale_data, redundant, noise, nb_delete_steps, lmbda, mu, classification, 
@@ -79,10 +38,10 @@ def experiment(dataset, synth_params, size, scale_data, redundant, noise, nb_del
     X, y = load_experiment(dataset, synth_params, size, redundant, noise, classification)
 
     scores_regular_all = []
-    scores_screened_all = []
+    scores_ell_all = []
+    scores_dg_all = []
     scores_r_all = []
-    #scores_margin_all = []
-
+    
     compt_exp = 0
     idx_safe_all = 0
     
@@ -91,6 +50,12 @@ def experiment(dataset, synth_params, size, scale_data, redundant, noise, nb_del
         np.random.seed(compt_exp)
         compt_exp += 1
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+        screener_ell = EllipsoidScreener(lmbda=lmbda, mu=mu, loss=loss, penalty=penalty, 
+                                            intercept=intercept, classification=classification, 
+                                            n_ellipsoid_steps=n_ellipsoid_steps, 
+                                            better_init=better_init, better_radius=better_radius, 
+                                            cut=cut, clip_ell=clip_ell)
+        screener_dg = DualityGapScreener(lmbda=lmbda, n_epochs=n_ellipsoid_steps)
         if scale_data:
             scaler = StandardScaler()
             X_train = scaler.fit_transform(X_train)
@@ -101,89 +66,81 @@ def experiment(dataset, synth_params, size, scale_data, redundant, noise, nb_del
             if get_ell_from_subset < X_train_.shape[0]:
                 X_train_ = X_train_[:get_ell_from_subset]
                 y_train_ = y_train_[:get_ell_from_subset]
-            z, scaling, L, I_k_vec, g, r_init = experiment_get_ellipsoid(X_train_, y_train_, intercept, better_init, 
-                                                            better_radius, loss, penalty, lmbda, 
-                                                            classification, mu, n_ellipsoid_steps)
+                scores_screendg = screener_dg.screen(X_train_, y_train_)
+                scores_screenell = screener_ell.screen(X_train_, y_train_)
         else:
-            z, scaling, L, I_k_vec, g, r_init = experiment_get_ellipsoid(X_train, y_train, intercept, better_init, 
-                                                            better_radius, loss, penalty, lmbda, 
-                                                            classification, mu, n_ellipsoid_steps)
-        if clip_ell:
-            I_k_vec = I_k_vec.reshape(-1,1)
-            A = scaling * np.identity(X.shape[1]) - L.dot(np.multiply(I_k_vec, np.transpose(L)))
-            eigenvals, eigenvect = np.linalg.eigh(A)
-            eigenvals = np.clip(eigenvals, 0, r_init)
-            eigenvals = eigenvals.reshape(-1,1)
-            A = eigenvect.dot(np.multiply(eigenvals, np.transpose(eigenvect)))
-            scores = rank_dataset(X_train, y_train, z, A, g,
-                                             lmbda, mu, classification, loss, penalty, intercept, cut)
-        else:                            
-            scores = rank_dataset_accelerated(X_train, y_train, z, scaling, L, I_k_vec, g,
-                                             lmbda, mu, classification, loss, penalty, intercept, cut)
-        print('SCORES', scores)
-        idx_safe = get_idx_safe(scores, mu, classification)
-        #print(idx_safe)
+            scores_screendg = screener_dg.screen(X_train, y_train)
+            scores_screenell = screener_ell.screen(X_train, y_train)
+        print('SCORES', scores_screenell)
+
+        idx_safe = get_idx_safe(scores_screenell, mu, classification)
         idx_safe_all += idx_safe
         scores_regular = []
-        scores_screened = []
+        scores_ell = []
+        scores_dg = []
         scores_r = []
-        #scores_margin = []
-        
+
         nb_to_del_table = np.linspace(1, X_train.shape[0], nb_delete_steps, dtype='int')
 
         X_r = X_train
         y_r = y_train
         
-        for nb_to_delete in nb_to_del_table:
-            score_regular = 0
-            score_screened = 0
+        for i, nb_to_delete in enumerate(nb_to_del_table):
+            if i == 0:
+                score_regular = 0
+            score_ell = 0
+            score_dg = 0
             score_r = 0
-            #score_margin = 0
             compt = 0
-            X_screened, y_screened = screen(X_train, y_train, scores, nb_to_delete)
+            #TODO : utiliser simplement les indices ?
+            X_screenell, y_screenell = order(X_train, y_train, scores_screenell, nb_to_delete)
+            X_screendg, y_screendg = order(X_train, y_train, scores_screendg, nb_to_delete)
             X_r, y_r = random_screening(X_r, y_r, X_train.shape[0] - nb_to_delete)
-            #model = fit_estimator(X_train, y_train, loss, penalty, mu, lmbda, intercept, max_iter=10)
-            #X_margin, y_margin = screen_baseline_margin(X_train, y_train, model, nb_to_delete)
             if not(dataset_has_both_labels(y_r)):
                 print('Warning, only one label in randomly screened dataset')
-            if not(dataset_has_both_labels(y_screened)):
-                print('Warning, only one label in screened dataset')
-            #if not(dataset_has_both_labels(y_margin)):
-                #print('Warning, only one label in margin dataset')
-            if not(dataset_has_both_labels(y_r) and dataset_has_both_labels(y_screened)): # and dataset_has_both_labels(y_margin)):
+            if not(dataset_has_both_labels(y_screenell)):
+                print('Warning, only one label in screenell dataset')
+            if not(dataset_has_both_labels(y_screendg)):
+                print('Warning, only one label in screendg dataset')
+            if not(dataset_has_both_labels(y_r) and dataset_has_both_labels(y_screenell) and dataset_has_both_labels(y_screendg)): 
                 break
-            print(X_train.shape, X_screened.shape, X_r.shape) #, X_margin.shape)
+            print(X_train.shape, X_screenell.shape, X_r.shape) 
             while compt < nb_test:
                 compt += 1
-                estimator_regular = fit_estimator(X_train, y_train, loss, penalty, mu, lmbda, intercept)
-                estimator_screened = fit_estimator(X_screened, y_screened, loss, penalty, mu, lmbda, 
+                if i == 0:
+                    estimator_regular = fit_estimator(X_train, y_train, loss, penalty, mu, lmbda, intercept)
+                estimator_screenell = fit_estimator(X_screenell, y_screenell, loss, penalty, mu, lmbda, 
+                intercept)
+                estimator_screendg = fit_estimator(X_screendg, y_screendg, loss, penalty, mu, lmbda, 
                 intercept)
                 estimator_r = fit_estimator(X_r, y_r, loss, penalty, mu, lmbda, intercept)
-                #estimator_margin = fit_estimator(X_margin, y_margin, loss, penalty, mu, lmbda, intercept)
                 if classif_score:
-                    score_regular += scoring_classif(estimator_regular, X_test, y_test)
-                    score_screened += scoring_classif(estimator_screened, X_test, y_test)
+                    if i == 0:
+                        score_regular += scoring_classif(estimator_regular, X_test, y_test)
+                    score_ell += scoring_classif(estimator_screenell, X_test, y_test)
+                    score_dg += scoring_classif(estimator_screendg, X_test, y_test)
                     score_r += scoring_classif(estimator_r, X_test, y_test)
-                    #score_margin += scoring_classif(estimator_margin, X_test, y_test)
                 else:
-                    score_regular += estimator_regular.score(X_test, y_test)
-                    score_screened += estimator_screened.score(X_test, y_test)
+                    if i == 0:
+                        score_regular += estimator_regular.score(X_test, y_test)
+                    score_ell += estimator_screenell.score(X_test, y_test)
+                    score_dg += estimator_screendg.score(X_test, y_test)
                     score_r += estimator_r.score(X_test, y_test)
-                    #score_margin += estimator_margin.score(X_test, y_test)
+
             scores_regular.append(score_regular / nb_test)
-            scores_screened.append(score_screened / nb_test)
+            scores_ell.append(score_ell / nb_test)
+            scores_dg.append(score_dg / nb_test)
             scores_r.append(score_r / nb_test)
-            #scores_margin.append(score_margin / nb_test)
 
         scores_regular_all.append(scores_regular)
-        scores_screened_all.append(scores_screened)
+        scores_ell_all.append(scores_ell)
+        scores_dg_all.append(scores_dg)
         scores_r_all.append(scores_r)
-        #scores_margin_all.append(scores_margin)
 
     print('Number of datapoints we can screen (if safe rules apply to the experiment):', idx_safe_all / nb_exp)
 
-    data = (nb_to_del_table, scores_regular_all, scores_screened_all, scores_r_all, 
-        idx_safe_all / nb_exp, X_train.shape[0]) #, scores_margin_all)
+    data = (nb_to_del_table, scores_regular_all, scores_ell_all, scores_dg_all, scores_r_all, 
+        idx_safe_all / nb_exp, X_train.shape[0])
     save_dataset_folder = os.path.join(RESULTS_PATH, dataset)
     os.makedirs(save_dataset_folder, exist_ok=True)
     if not dontsave:
@@ -226,9 +183,8 @@ if __name__ == '__main__':
 
     print('START')
 
-    experiment(args.dataset, args.synth_params, args.size, args.scale_data, args.redundant, args.noise, args.nb_delete_steps, 
-        args.lmbda, args.mu, 
-        args.classification, args.loss, args.penalty, args.intercept, args.classif_score, 
-        args.n_ellipsoid_steps, args.better_init, args.better_radius, args.cut_ell, 
-        args.get_ell_from_subset, args.clip_ell, args.nb_exp, args.nb_test, args.plot, args.zoom,
-        args.dontsave)
+    experiment(args.dataset, args.synth_params, args.size, args.scale_data, args.redundant, args.noise, 
+                args.nb_delete_steps, args.lmbda, args.mu, args.classification, args.loss, args.penalty, 
+                args.intercept, args.classif_score, args.n_ellipsoid_steps, args.better_init, 
+                args.better_radius, args.cut_ell, args.get_ell_from_subset, args.clip_ell, args.nb_exp, 
+                args.nb_test, args.plot, args.zoom, args.dontsave)

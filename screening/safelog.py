@@ -50,7 +50,7 @@ if __name__ == "__main__":
     #we test that this penalty does well on MNIST
 
     X, y = load_experiment(dataset='mnist', synth_params=None, size=60000, redundant=0, 
-                            noise=None, classification=True, path='./datasets/')
+                            noise=None, classification=True)
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
     safelog = SafeLogistic(mu=0, lmbda=0.0, max_iter=10000)
     safelog.fit(X_train, y_train)

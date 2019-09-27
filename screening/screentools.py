@@ -30,11 +30,10 @@ def fit_estimator(X, y, loss, penalty, mu, lmbda, intercept, max_iter=10000):
     	print('ERROR, you picked a combination which is not implemented.')
     return estimator
 
-
+#TODO : eliminate the loops
 def compute_truncated_squared_loss_gradient(u, mu):
     g = np.zeros(u.size)
     for i in range(u.size):
-        #print('U_i', np.abs(u[i]))
         if np.abs(u[i]) > mu:
             g[i] = 2 * (u[i] - np.sign(u[i]) * mu)
     return g
@@ -50,12 +49,15 @@ def compute_hinge_subgradient(u, mu):
     return g
 
 
-def compute_squared_hinge_subgradient(u, mu):
+def compute_squared_hinge_gradient_(u, mu):
     g = np.zeros(u.size)
     for i in range(u.size):
         if u[i] < mu:
             g[i] = -2 * (mu - u[i])
     return g
+
+def compute_squared_hinge_gradient(u, mu):
+    return np.minimum(-2 * (mu * np.ones(len(u)) - u), 0)
 
 
 def compute_l1_subgradient(u):
@@ -91,7 +93,7 @@ def compute_subgradient(x, D, y, lmbda, mu, loss, penalty, intercept):
         g_1 = (np.transpose(D).dot(y * g_1))
     elif loss == 'squared_hinge':
         output = y * D.dot(x)
-        g_1 = compute_squared_hinge_subgradient(output, mu)
+        g_1 = compute_squared_hinge_gradient(output, mu)
         g_1 = (np.transpose(D).dot(y * g_1))
     elif loss == 'safe_logistic' or loss == 'logistic':
         output = y * D.dot(x)

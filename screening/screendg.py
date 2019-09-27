@@ -1,5 +1,8 @@
-from lightning.classification import LinearSVC as LinearSVC_l
-from screening.screentools import rank_dataset
+from sklearn.svm import LinearSVC
+from screening.screentools import (
+    rank_dataset,
+    compute_squared_hinge_gradient
+)
 import numpy as np
 
 class DualityGapScreener:
@@ -13,41 +16,38 @@ class DualityGapScreener:
     def __init__(self, lmbda, n_epochs):
         self.lmbda = lmbda
         self.n_epochs = n_epochs
-
-    def compute_coef_(self, svc):
-        return np.dot(self.X.T, svc.dual_coef_.reshape(-1, 1))
-
-    def squared_hinge(self, prediction):
-        loss = np.maximum(np.ones(len(prediction)) - prediction, 0) ** 2
-        return np.sum(loss)
-
-    def squared_hinge_conjugate(self, dual_variable):
-        dual_loss = dual_variable + (1 / 4) * (dual_variable ** 2)
-        return np.sum(dual_loss)
-
-    def compute_primal_objective(self, svc):
-        #coef = self.compute_coef_(svc) if one does not have the primal coef
-        coef = svc.coef_.reshape(-1,1)
-        prediction = np.dot(self.X, coef).flatten() * self.y
-        loss = self.squared_hinge(prediction)
-        return (1 / self.X.shape[0]) * loss + (1 / (2 * svc.C)) * np.linalg.norm(coef)
-
-    def compute_dual_objective(self, svc):
-        dual_prediction = np.dot(self.X.T, svc.dual_coef_.reshape(-1, 1))
-        dual_loss = - self.squared_hinge_conjugate(svc.dual_coef_.reshape(-1, 1))
-        return (1 / self.X.shape[0]) * dual_loss - ( 2 * svc.C / (self.X.shape[0] ** 2) ) * np.linalg.norm(dual_prediction)
+  
+    def loss_gradient(self, pred):
+        '''
+        Gradient of the Squared Hinge Loss.
+        '''
+        return compute_squared_hinge_gradient(u=pred, mu=1)
     
-    def get_duality_gap(self, svc):
-        self.duality_gap = self.compute_primal_objective(svc) - self.compute_dual_objective(svc)
+    def get_duality_gap_gradient(self, svc):
+        '''
+        Uses the trick in Sparse Coding for ML, Mairal, 2010, Appendix D.2.3.
+        Liblinear and Lightning optimize (1/2) * ||x|| ^2 + C * loss(Ax).
+        The loss is not normalized by the number of samples
+        '''
+        coef = svc.coef_.reshape(-1,1)
+        pred = np.dot(self.X, coef).flatten() * self.y
+        grad_pred = self.loss_gradient(pred)
+        primal_reg = (self.lmbda / 2) * (np.linalg.norm(svc.coef_) ** 2)
+        dual_reg = (self.lmbda / 2) * (np.linalg.norm(-np.dot((self.X.T * self.y) , grad_pred) / self.lmbda)) ** 2
+        grad_loss = np.dot(pred.T, grad_pred)
+        self.duality_gap = primal_reg + dual_reg + grad_loss
         return self.duality_gap
       
     def screen(self, X, y):
         # tol must be small enough so that max_iter is attained
         self.X = X
         self.y = y
-        svc = LinearSVC_l(C=1/self.lmbda, loss='squared_hinge', max_iter=self.n_epochs, tol=0.00001).fit(self.X, self.y)
-        squared_radius = 2 * self.get_duality_gap(svc) / self.lmbda
-        A = squared_radius * np.identity(X.shape[1])
+        svc = LinearSVC(loss='squared_hinge', dual=False, C=1/self.lmbda, fit_intercept=False, 
+                            max_iter=self.n_epochs, tol=1.0e-10).fit(self.X, self.y)
+        self.z = svc.coef_
+        dg = self.get_duality_gap_gradient(svc)
+        self.squared_radius = 2 * dg / self.lmbda
+        A = self.squared_radius * np.identity(X.shape[1])
         return rank_dataset(D=self.X, y=self.y, z=svc.coef_.reshape(-1, 1), A=A, g=None, mu=1, 
                             classification=True, intercept=False, cut=False)
 
@@ -60,6 +60,5 @@ if __name__ == "__main__":
     X, y = load_experiment(dataset='mnist', synth_params=None, size=60000, redundant=0, 
                             noise=None, classification=True)
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
-    #svc = LinearSVC_l(C=1/lmbda, loss='squared_hinge', max_iter=100, tol=0.0001).fit(X_train, y_train)
     screener = DualityGapScreener(lmbda=0.001, n_epochs=10)
     print('SCORES', screener.screen(X_train, y_train))

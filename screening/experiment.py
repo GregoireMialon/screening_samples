@@ -3,7 +3,7 @@ import argparse
 from sklearn.model_selection import train_test_split
 from screening.tools import (
     make_data, make_redundant_data, make_redundant_data_classification, 
-    balanced_subsample, random_screening, dataset_has_both_labels, order, get_idx_safe, 
+    balanced_subsample, random_screening, dataset_has_both_labels, order, get_nb_safe, 
     scoring_classif, plot_experiment, screen_baseline_margin
 )
 from screening.screentools import (
@@ -17,7 +17,6 @@ from screening.screendg import DualityGapScreener
 from screening.loaders import load_experiment
 from screening.safelog import SafeLogistic
 from sklearn.svm import LinearSVC
-from lightning.classification import LinearSVC as LinearSVC_l
 from sklearn.linear_model import Lasso, LogisticRegression
 from sklearn.utils import shuffle
 from sklearn.preprocessing import StandardScaler
@@ -30,7 +29,7 @@ def experiment(dataset, synth_params, size, scale_data, redundant, noise, nb_del
                 loss, penalty, intercept, classif_score, n_ellipsoid_steps, better_init, 
                 better_radius, cut, get_ell_from_subset, clip_ell, nb_exp, nb_test, plot, zoom, 
                 dontsave):
-    exp_title = 'X_size_{}_sub_ell_{}_loss_{}_lmbda_{}_n_ellipsoid_{}_intercept_{}_mu_{}_redundant_{}_noise_{}_better_init_{}_better_radius_{}_cut_ell_{}_clip_ell_{}'.format(size, 
+    exp_title = 'X_size_{}_ell_subset_{}_loss_{}_lmbda_{}_n_ellipsoid_{}_intercept_{}_mu_{}_redundant_{}_noise_{}_better_init_{}_better_radius_{}_cut_ell_{}_clip_ell_{}'.format(size, 
         get_ell_from_subset, loss, lmbda, n_ellipsoid_steps, intercept, mu, redundant, noise, better_init, 
         better_radius, cut, clip_ell)
     print(exp_title)
@@ -43,7 +42,8 @@ def experiment(dataset, synth_params, size, scale_data, redundant, noise, nb_del
     scores_r_all = []
     
     compt_exp = 0
-    idx_safe_all = 0
+    nb_safe_ell_all = 0
+    nb_safe_dg_all = 0
     
     while compt_exp < nb_exp:
         random.seed(compt_exp)
@@ -55,26 +55,27 @@ def experiment(dataset, synth_params, size, scale_data, redundant, noise, nb_del
                                             n_ellipsoid_steps=n_ellipsoid_steps, 
                                             better_init=better_init, better_radius=better_radius, 
                                             cut=cut, clip_ell=clip_ell)
-        screener_dg = DualityGapScreener(lmbda=lmbda, n_epochs=n_ellipsoid_steps)
+        screener_dg = DualityGapScreener(lmbda=lmbda, n_epochs=better_init)
         if scale_data:
             scaler = StandardScaler()
             X_train = scaler.fit_transform(X_train)
             X_test = scaler.transform(X_test)
         if get_ell_from_subset != 0:
-            X_train_, y_train_ = balanced_subsample(X_train, y_train)
-            X_train_, y_train_ = shuffle(X_train_, y_train_)
-            if get_ell_from_subset < X_train_.shape[0]:
-                X_train_ = X_train_[:get_ell_from_subset]
-                y_train_ = y_train_[:get_ell_from_subset]
-                scores_screendg = screener_dg.screen(X_train_, y_train_)
-                scores_screenell = screener_ell.screen(X_train_, y_train_)
+            random_subset = random.sample(range(0, X_train.shape[0]), get_ell_from_subset)
+            scores_screendg = screener_dg.screen(X_train[random_subset], y_train[random_subset])
+            scores_screenell = screener_ell.screen(X_train[random_subset], y_train[random_subset])
         else:
             scores_screendg = screener_dg.screen(X_train, y_train)
             scores_screenell = screener_ell.screen(X_train, y_train)
-        print('SCORES', scores_screenell)
 
-        idx_safe = get_idx_safe(scores_screenell, mu, classification)
-        idx_safe_all += idx_safe
+        print('SCORES_ELL', scores_screenell)
+        print('SCORES_DG', scores_screendg)
+
+        nb_safe_ell = get_nb_safe(scores_screenell, mu, classification)
+        nb_safe_ell_all += nb_safe_ell
+        nb_safe_dg = get_nb_safe(scores_screendg, mu, classification)
+        nb_safe_dg_all += nb_safe_dg
+
         scores_regular = []
         scores_ell = []
         scores_dg = []
@@ -137,10 +138,19 @@ def experiment(dataset, synth_params, size, scale_data, redundant, noise, nb_del
         scores_dg_all.append(scores_dg)
         scores_r_all.append(scores_r)
 
-    print('Number of datapoints we can screen (if safe rules apply to the experiment):', idx_safe_all / nb_exp)
+    print('Number of datapoints we can safely screen with ellipsoid method:', nb_safe_ell_all / nb_exp)
+    print('Number of datapoints we can safely screen with duality gap method:', nb_safe_dg_all / nb_exp)
 
-    data = (nb_to_del_table, scores_regular_all, scores_ell_all, scores_dg_all, scores_r_all, 
-        idx_safe_all / nb_exp, X_train.shape[0])
+    data = {
+        'nb_to_del_table': nb_to_del_table,
+        'scores_regular': scores_regular_all,
+        'scores_ell': scores_ell_all,
+        'scores_dg': scores_dg_all,
+        'scores_r': scores_r_all,
+        'nb_safe_ell': nb_safe_ell_all / nb_exp,
+        'nb_safe_dg': nb_safe_dg_all / nb_exp,
+        'train_set_size': X_train.shape[0]
+    }
     save_dataset_folder = os.path.join(RESULTS_PATH, dataset)
     os.makedirs(save_dataset_folder, exist_ok=True)
     if not dontsave:

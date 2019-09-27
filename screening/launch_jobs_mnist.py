@@ -6,13 +6,13 @@ from screening.pyapt import apt_run
 from screening.settings import LOGS_PATH
 
 
-mus = [0.1, 0.5, 1]
-lmbdas = [0.0001, 0.001] #0 0.01, 0.1, 1, 10] 
-n_ellipsoid_stepss = [10, 100, 1000, 10000]
-better_inits = [0, 1, 10, 100]
+mus = [1.0]
+lmbdas = [0.0001, 0.001, 0.01]
+n_ellipsoid_stepss = [1, 10, 100, 1000]
+better_inits = [0, 1, 3, 10]
 better_radiuss = [0, 10, 100, 1000]
 sizes = [60000]
-sub_ells = [0]
+sub_ells = [0, 100, 1000]
 
 parallel_args = []
 for (mu, lmbda, n_ellipsoid_steps, better_init, better_radius, size, sub_ell) in itertools.product(
@@ -25,11 +25,11 @@ for (mu, lmbda, n_ellipsoid_steps, better_init, better_radius, size, sub_ell) in
 		'size': size,
 		'redundant': 0,
 		'penalty': 'l2',
-		'nb_delete_steps': 10,
+		'nb_delete_steps': 8,
 		'nb_exp': 3,
 		'nb_test': 2,
 		'classif_score': True,
-		'loss': 'logistic',
+		'loss': 'squared_hinge',
 		'classification': True,
 		'better_init': better_init,
 		'better_radius': better_radius,
@@ -61,5 +61,5 @@ apt_run(
         group_by=1,
         memory=20000,
         memory_hard=20000,
-        max_parrallel_jobs=8,
+        max_parrallel_jobs=20,
         multi_threading=1)

@@ -192,14 +192,14 @@ def screen_baseline_margin(X, y, model, nb_to_delete):
     return X_screened, y_screened
 
 
-def get_idx_safe(scores, mu, classification):
+def get_nb_safe(scores, mu, classification):
     scores = np.array(scores)
     if classification:
         idx = np.where(scores < - mu)[0]
     else:
         idx = np.where(scores < mu)[0]
-    idx_safe = len(idx)
-    return idx_safe
+    nb_safe = len(idx)
+    return nb_safe
 
 
 def scoring_classif(estimator, X, y):
@@ -223,14 +223,21 @@ def scoring_interval_regression(y, y_predict, y_predict_screened, mu):
 
 def plot_experiment(data, margin=False, train_set_size=None, zoom=None):
 
-    if len(data) >= 6:
-        train_set_size = data[5]
-    nb_to_del_table = data[0] / train_set_size
-    scores_regular_all = np.array(cut_list(data[1]))
-    scores_screened_all = np.array(cut_list(data[2]))
-    scores_r_all = np.array(cut_list(data[3]))
-    safe_fraction = data[4] / train_set_size
-    
+    if type(data).__name__ != 'dict':
+        if len(data) >= 6:
+            train_set_size = data[5]
+        nb_to_del_table = data[0] / train_set_size
+        scores_regular_all = np.array(cut_list(data[1]))
+        scores_screened_all = np.array(cut_list(data[2]))
+        scores_r_all = np.array(cut_list(data[3]))
+        safe_fraction = data[4] / train_set_size
+    else:
+        nb_to_del_table = data['nb_to_del_table'] / data['train_set_size']
+        scores_regular_all = np.array(cut_list(data['scores_regular']))
+        scores_screened_all = np.array(cut_list(data['scores_ell']))
+        scores_r_all = np.array(cut_list(data['scores_r']))
+        safe_fraction = data['nb_safe_ell'] / data['train_set_size']
+
     scores_regular_mean = np.mean(scores_regular_all, 0)
     scores_screened_mean = np.mean(scores_screened_all, 0)
     scores_r_mean = np.mean(scores_r_all, 0)

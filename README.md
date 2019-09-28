@@ -11,7 +11,8 @@
 
 ## Launch
 
-`python experiment.py --intercept --cut`
+`python experiment.py`
+Possible arguments are detailed in `experiment.py`.
 
 ### Interval Regression : Install plasp
 

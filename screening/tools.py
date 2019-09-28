@@ -222,7 +222,7 @@ def scoring_interval_regression(y, y_predict, y_predict_screened, mu):
 
 
 def plot_experiment(data, margin=False, train_set_size=None, zoom=None):
-
+    data = data.item()
     if type(data).__name__ != 'dict':
         if len(data) >= 6:
             train_set_size = data[5]
@@ -272,6 +272,8 @@ def plot_experiment(data, margin=False, train_set_size=None, zoom=None):
     ax1.tick_params('x', labelsize=30)
     fig.tight_layout()
     #ax1.legend()
+    plt.grid(color='white', linewidth=3)
+    ax1.set_facecolor('whitesmoke')
     plt.show()
     return
 

@@ -53,20 +53,24 @@ def experiment(dataset, synth_params, size, scale_data, redundant, noise, nb_del
         screener_ell = EllipsoidScreener(lmbda=lmbda, mu=mu, loss=loss, penalty=penalty, 
                                             intercept=intercept, classification=classification, 
                                             n_ellipsoid_steps=n_ellipsoid_steps, 
-                                            better_init=better_init, better_radius=better_radius, 
+                                            better_init=0, better_radius=0, 
                                             cut=cut, clip_ell=clip_ell)
         screener_dg = DualityGapScreener(lmbda=lmbda, n_epochs=better_init)
+
         if scale_data:
             scaler = StandardScaler()
             X_train = scaler.fit_transform(X_train)
             X_test = scaler.transform(X_test)
+
         if get_ell_from_subset != 0:
             random_subset = random.sample(range(0, X_train.shape[0]), get_ell_from_subset)
             scores_screendg = screener_dg.screen(X_train[random_subset], y_train[random_subset])
-            scores_screenell = screener_ell.screen(X_train[random_subset], y_train[random_subset])
+            scores_screenell = screener_ell.screen(X_train[random_subset], y_train[random_subset], 
+                                                    init=screener_dg.z, rad=screener_dg.squared_radius)
         else:
             scores_screendg = screener_dg.screen(X_train, y_train)
-            scores_screenell = screener_ell.screen(X_train, y_train)
+            scores_screenell = screener_ell.screen(X_train, y_train, init=screener_dg.z, 
+                                                    rad=screener_dg.squared_radius)
 
         print('SCORES_ELL', scores_screenell)
         print('SCORES_DG', scores_screendg)
@@ -93,7 +97,7 @@ def experiment(dataset, synth_params, size, scale_data, redundant, noise, nb_del
             score_dg = 0
             score_r = 0
             compt = 0
-            #TODO : utiliser simplement les indices ?
+            
             X_screenell, y_screenell = order(X_train, y_train, scores_screenell, nb_to_delete)
             X_screendg, y_screendg = order(X_train, y_train, scores_screendg, nb_to_delete)
             X_r, y_r = random_screening(X_r, y_r, X_train.shape[0] - nb_to_delete)
@@ -179,8 +183,8 @@ if __name__ == '__main__':
     parser.add_argument('--intercept', action='store_true')
     parser.add_argument('--classif_score', action='store_true', help='determines the score that is used')
     parser.add_argument('--n_ellipsoid_steps', default=1000, type=int, help='number of iterations of the ellipsoid method')
-    parser.add_argument('--better_init', default=0, type=int, help='number of optimizer gradient steps to initialize the center of the ellipsoid')
-    parser.add_argument('--better_radius', default=0, type=float, help='radius of the initial l2 ball')
+    parser.add_argument('--better_init', default=0, type=int, help='KEEP DEFAULT IF COMPARING TO THE BASELINE, number of optimizer gradient steps to initialize the center of the ellipsoid')
+    parser.add_argument('--better_radius', default=0, type=float, help='KEEP DEFAULT IF COMPARING TO THE BASELINE, radius of the initial l2 ball')
     parser.add_argument('--cut_ell', action='store_true', help='cut the final ellipsoid in half using a subgradient of the loss')
     parser.add_argument('--get_ell_from_subset', default=0, type=int, help='train the ellipsoid on a random subset of the dataset')
     parser.add_argument('--clip_ell', action='store_true', help='clip the eigenvalues of the ellipsoid')

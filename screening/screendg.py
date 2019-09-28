@@ -6,12 +6,12 @@ from screening.screentools import (
 import numpy as np
 
 class DualityGapScreener:
-    '''We consider lambda = 1 / ( 2 * C) with lambda the squared norm penalty term WITHOUT a factor 2.
-        
-       For the LinearSVC, lightning does as many iterations in an epoch as training examples. Thus,
-       1 Epoch of LinearSVC = 1 Ellipsoid Iteration.
+    '''
+    For the LinearSVC, liblinear does as many iterations in an epoch as training examples. Thus,
+    1 Epoch of LinearSVC = 1 Ellipsoid Iteration in terms of complexity.
        
-       Works with Squared Hinge and L2 Penalty only. Requires a smooth primal loss in general. '''
+    Works with Squared Hinge and L2 Penalty only. Requires a strongly convex primal loss. 
+    '''
 
     def __init__(self, lmbda, n_epochs):
         self.lmbda = lmbda
@@ -27,7 +27,7 @@ class DualityGapScreener:
         '''
         Uses the trick in Sparse Coding for ML, Mairal, 2010, Appendix D.2.3.
         Liblinear and Lightning optimize (1/2) * ||x|| ^2 + C * loss(Ax).
-        The loss is not normalized by the number of samples
+        The loss is not normalized by the number of samples.
         '''
         coef = svc.coef_.reshape(-1,1)
         pred = np.dot(self.X, coef).flatten() * self.y

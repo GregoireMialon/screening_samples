@@ -130,26 +130,32 @@ class EllipsoidScreener:
             r_init = float(self.better_radius)                            
         z, scaling, L, I_k_vec, g = self.iterate_ellipsoids_accelerated(X, y, z_init, r_init)
         return z, scaling, L, I_k_vec, g, r_init
+    
+    def fit(self, X_train, y_train, init=None, rad=0):
 
-    def screen(self, X, y, init=None, rad=0):
-
-        self.z, scaling, L, I_k_vec, g, r_init = self.get_ellipsoid(X, y, init, rad)
+        self.z, self.scaling, self.L, self.I_k_vec, self.g, self.r_init = self.get_ellipsoid(X_train, y_train, init, rad)
         if self.clip_ell:
-            I_k_vec = I_k_vec.reshape(-1,1)
-            A = scaling * np.identity(X.shape[1]) - L.dot(np.multiply(I_k_vec, np.transpose(L)))
+            self.I_k_vec = self.I_k_vec.reshape(-1,1)
+            A = self.scaling * np.identity(X_train.shape[1]) - self.L.dot(np.multiply(self.I_k_vec, np.transpose(self.L)))
             eigenvals, eigenvect = np.linalg.eigh(A)
-            eigenvals = np.clip(eigenvals, 0, r_init)
+            eigenvals = np.clip(eigenvals, 0, self.r_init)
             eigenvals = eigenvals.reshape(-1,1)
-            A = eigenvect.dot(np.multiply(eigenvals, np.transpose(eigenvect)))
-            self.scores = rank_dataset(X, y, self.z, A, g,
+            self.A = eigenvect.dot(np.multiply(eigenvals, np.transpose(eigenvect)))
+
+        return self
+
+    def screen(self, X, y):
+
+        if self.clip_ell:
+            self.scores = rank_dataset(X, y, self.z, self.A, self.g,
                                     self.mu, self.classification, self.intercept, self.cut)
         else:
-            self.scores = rank_dataset_accelerated(X, y, self.z, scaling, L, I_k_vec, g,
+            self.scores = rank_dataset_accelerated(X, y, self.z, self.scaling, self.L, self.I_k_vec, self.g,
                                     self.mu, self.classification, self.intercept, self.cut)
         return self.scores
 
 if __name__ == "__main__":
-    #we test that it works with MNIST
+    #we check that it works with MNIST
     from screening.tools import scoring_classif
     from sklearn.model_selection import train_test_split
     from screening.loaders import load_experiment
@@ -157,11 +163,11 @@ if __name__ == "__main__":
     X, y = load_experiment(dataset='mnist', synth_params=None, size=1000, redundant=0, 
                             noise=None, classification=True)
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+    z_init = np.random.rand(X_train.shape[1])
     screener = EllipsoidScreener(lmbda=0.0001, mu=1, loss='squared_hinge', penalty='l2', 
                                 intercept=False, classification=True, n_ellipsoid_steps=10, 
                                 better_init=0, better_radius=0, cut=False, clip_ell=False, 
-                                sgd=False)
-    z_init = np.random.rand(X_train.shape[1])
-    scores = screener.screen(X_train, y_train, init=z_init, rad=10)
+                                sgd=False).fit(X_train, y_train, init=z_init, rad=10)
+    scores = screener.screen(X_train, y_train)
     print('SCORES', scores[:10], 'CENTER', screener.z[:20])
   

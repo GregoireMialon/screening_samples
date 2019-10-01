@@ -49,15 +49,16 @@ def compute_hinge_subgradient(u, mu):
     return g
 
 
-def compute_squared_hinge_gradient_(u, mu):
-    g = np.zeros(u.size)
-    for i in range(u.size):
-        if u[i] < mu:
-            g[i] = -2 * (mu - u[i])
-    return g
+def compute_squared_hinge(u, mu):
+    return np.sum(np.maximum((mu * np.ones(len(u)) - u), 0) ** 2)
+
 
 def compute_squared_hinge_gradient(u, mu):
     return np.minimum(-2 * (mu * np.ones(len(u)) - u), 0)
+
+
+def compute_squared_hinge_conjugate(u):
+    return np.sum((1 / 4) * (u ** 2) + u)
 
 
 def compute_l1_subgradient(u):

@@ -64,16 +64,22 @@ def experiment(dataset, synth_params, size, scale_data, redundant, noise, nb_del
 
         if get_ell_from_subset != 0:
             random_subset = random.sample(range(0, X_train.shape[0]), get_ell_from_subset)
-            scores_screendg = screener_dg.screen(X_train[random_subset], y_train[random_subset])
-            scores_screenell = screener_ell.screen(X_train[random_subset], y_train[random_subset], 
+            screener_dg.fit(X_train[random_subset], y_train[random_subset])
+            screener_ell.fit(X_train[random_subset], y_train[random_subset], 
                                                     init=screener_dg.z.reshape(-1,), rad=screener_dg.squared_radius)
         else:
-            scores_screendg = screener_dg.screen(X_train, y_train)
-            scores_screenell = screener_ell.screen(X_train, y_train, init=screener_dg.z.reshape(-1,), 
+            screener_dg.fit(X_train, y_train)
+            screener_ell.fit(X_train, y_train, init=screener_dg.z.reshape(-1,), 
                                                     rad=screener_dg.squared_radius)
+            
+        scores_screendg = screener_dg.screen(X_train, y_train)
+        scores_screenell = screener_ell.screen(X_train, y_train)
+        
+        idx_screendg = np.argsort(scores_screendg)
+        idx_screenell = np.argsort(scores_screenell)
 
-        print('SCORES_ELL', scores_screenell)
-        print('SCORES_DG', scores_screendg)
+        print('SCORES_DG', scores_screendg[:10])
+        print('SCORES_ELL', len(scores_screenell))
 
         nb_safe_ell = get_nb_safe(scores_screenell, mu, classification)
         nb_safe_ell_all += nb_safe_ell
@@ -85,7 +91,9 @@ def experiment(dataset, synth_params, size, scale_data, redundant, noise, nb_del
         scores_dg = []
         scores_r = []
 
-        nb_to_del_table = np.linspace(1, X_train.shape[0], nb_delete_steps, dtype='int')
+        #nb_to_del_table = np.linspace(1, X_train.shape[0], nb_delete_steps, dtype='int')
+        nb_to_del_table = np.sqrt(np.linspace(1, X_train.shape[0], nb_delete_steps, dtype='int'))
+        nb_to_del_table = np.ceil(nb_to_del_table * (X_train.shape[0] / nb_to_del_table[-1])).astype(int)
 
         X_r = X_train
         y_r = y_train
@@ -98,8 +106,8 @@ def experiment(dataset, synth_params, size, scale_data, redundant, noise, nb_del
             score_r = 0
             compt = 0
             
-            X_screenell, y_screenell = order(X_train, y_train, scores_screenell, nb_to_delete)
-            X_screendg, y_screendg = order(X_train, y_train, scores_screendg, nb_to_delete)
+            X_screenell, y_screenell = X_train[idx_screenell[nb_to_delete:]], y_train[idx_screenell[nb_to_delete:]]
+            X_screendg, y_screendg = X_train[idx_screendg[nb_to_delete:]], y_train[idx_screendg[nb_to_delete:]]
             X_r, y_r = random_screening(X_r, y_r, X_train.shape[0] - nb_to_delete)
             if not(dataset_has_both_labels(y_r)):
                 print('Warning, only one label in randomly screened dataset')
@@ -109,7 +117,8 @@ def experiment(dataset, synth_params, size, scale_data, redundant, noise, nb_del
                 print('Warning, only one label in screendg dataset')
             if not(dataset_has_both_labels(y_r) and dataset_has_both_labels(y_screenell) and dataset_has_both_labels(y_screendg)): 
                 break
-            print(X_train.shape, X_screenell.shape, X_r.shape) 
+            print('X_train :', X_train.shape,'X_screenell :', X_screenell.shape, 'X_screendg : ', X_screendg.shape,
+                  'X_random : ', X_r.shape) 
             while compt < nb_test:
                 compt += 1
                 if i == 0:
@@ -163,6 +172,8 @@ def experiment(dataset, synth_params, size, scale_data, redundant, noise, nb_del
 
     if plot:
         plot_experiment(data, zoom=zoom)
+    
+    print('END')
     
     return
 

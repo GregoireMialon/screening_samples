@@ -178,12 +178,6 @@ def cut_list(my_list):
     return final_list
 
 
-def order(X, y, scores, nb_to_delete):
-    idx_to_delete = np.argsort(scores)[0:nb_to_delete]
-    X_screened = np.delete(X, idx_to_delete, 0)
-    y_screened = np.delete(y, idx_to_delete, 0)
-    return X_screened, y_screened
-
 def screen_baseline_margin(X, y, model, nb_to_delete):
     scores = np.abs(model.predict(X) - y)
     idx_to_delete = np.argsort(scores)[0:nb_to_delete]

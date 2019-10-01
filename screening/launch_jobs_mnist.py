@@ -9,14 +9,15 @@ from screening.settings import LOGS_PATH
 mus = [1.0]
 lmbdas = [0.0001, 0.001, 0.01]
 n_ellipsoid_stepss = [1, 10, 100, 1000]
-better_inits = [0, 1, 3, 10]
+better_inits = [0]
 better_radiuss = [0, 10, 100, 1000]
 sizes = [60000]
 sub_ells = [0, 100, 1000]
+n_dgs = [1, 3, 5, 10]
 
 parallel_args = []
-for (mu, lmbda, n_ellipsoid_steps, better_init, better_radius, size, sub_ell) in itertools.product(
-    mus, lmbdas, n_ellipsoid_stepss, better_inits, better_radiuss, sizes, sub_ells):
+for (mu, lmbda, n_ellipsoid_steps, better_init, better_radius, size, sub_ell, n_dg) in itertools.product(
+    mus, lmbdas, n_ellipsoid_stepss, better_inits, better_radiuss, sizes, sub_ells, n_dgs):
 	args = {
 		'mu': mu,
 		'lmbda': lmbda,
@@ -25,7 +26,7 @@ for (mu, lmbda, n_ellipsoid_steps, better_init, better_radius, size, sub_ell) in
 		'size': size,
 		'redundant': 0,
 		'penalty': 'l2',
-		'nb_delete_steps': 8,
+		'nb_delete_steps': 6,
 		'nb_exp': 3,
 		'nb_test': 2,
 		'classif_score': True,
@@ -33,9 +34,10 @@ for (mu, lmbda, n_ellipsoid_steps, better_init, better_radius, size, sub_ell) in
 		'classification': True,
 		'better_init': better_init,
 		'better_radius': better_radius,
-		'zoom': 0,
-		#'cut': False,
-		'get_ell_from_subset': sub_ell
+		'get_ell_from_subset': sub_ell,
+		'cut': True,
+		'n_epochs_dg': n_dg,
+		'zoom': 0
 		}
 	parallel_args.append(args)
 

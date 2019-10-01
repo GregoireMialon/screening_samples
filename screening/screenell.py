@@ -122,7 +122,7 @@ class EllipsoidScreener:
                 z_init = est.coef_
                 if self.intercept:
                     z_init = np.append(z_init, est.intercept_)
-        if init.all() != None and self.better_init == 0:
+        if init is not None and self.better_init == 0:
             z_init = init
         if rad != 0 and self.better_radius == 0:
             r_init = rad
@@ -159,9 +159,9 @@ if __name__ == "__main__":
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
     screener = EllipsoidScreener(lmbda=0.0001, mu=1, loss='squared_hinge', penalty='l2', 
                                 intercept=False, classification=True, n_ellipsoid_steps=10, 
-                                better_init=1, better_radius=0, cut=False, clip_ell=False, 
+                                better_init=0, better_radius=0, cut=False, clip_ell=False, 
                                 sgd=False)
     z_init = np.random.rand(X_train.shape[1])
-    scores = screener.screen(X_train, y_train, init=z_init)
+    scores = screener.screen(X_train, y_train, init=z_init, rad=10)
     print('SCORES', scores[:10], 'CENTER', screener.z[:20])
   

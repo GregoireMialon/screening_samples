@@ -3,18 +3,17 @@ import argparse
 from sklearn.model_selection import train_test_split
 from screening.tools import (
     make_data, make_redundant_data, make_redundant_data_classification, 
-    balanced_subsample, random_screening, dataset_has_both_labels, order, get_nb_safe, 
+    balanced_subsample, random_screening, dataset_has_both_labels, get_nb_safe, 
     scoring_classif, plot_experiment, screen_baseline_margin
 )
 from screening.screentools import (
     fit_estimator,
-    iterate_ellipsoids_accelerated,
     rank_dataset_accelerated,
     rank_dataset
 )
+from screening.loaders import load_experiment
 from screening.screenell import EllipsoidScreener
 from screening.screendg import DualityGapScreener
-from screening.loaders import load_experiment
 from screening.safelog import SafeLogistic
 from sklearn.svm import LinearSVC
 from sklearn.linear_model import Lasso, LogisticRegression
@@ -27,11 +26,14 @@ import os
 #@profile
 def experiment(dataset, synth_params, size, scale_data, redundant, noise, nb_delete_steps, lmbda, mu, classification, 
                 loss, penalty, intercept, classif_score, n_ellipsoid_steps, better_init, 
-                better_radius, cut, get_ell_from_subset, clip_ell, n_epochs_dg, nb_exp, nb_test, plot, zoom, 
+                better_radius, cut, get_ell_from_subset, clip_ell, use_sphere, n_epochs_dg, nb_exp, nb_test, plot, zoom, 
                 dontsave):
-    exp_title = 'X_size_{}_ell_subset_{}_loss_{}_lmbda_{}_n_ellipsoid_{}_intercept_{}_mu_{}_redundant_{}_noise_{}_better_init_{}_better_radius_{}_cut_ell_{}_clip_ell_{}_n_dg_{}'.format(size, 
+    
+    print('START')
+
+    exp_title = 'X_size_{}_ell_subset_{}_loss_{}_lmbda_{}_n_ellipsoid_{}_intercept_{}_mu_{}_redundant_{}_noise_{}_better_init_{}_better_radius_{}_cut_ell_{}_clip_ell_{}_n_dg_{}_use_sphere_{}'.format(size, 
         get_ell_from_subset, loss, lmbda, n_ellipsoid_steps, intercept, mu, redundant, noise, better_init, 
-        better_radius, cut, clip_ell, n_epochs_dg)
+        better_radius, cut, clip_ell, n_epochs_dg, use_sphere)
     print(exp_title)
 
     X, y = load_experiment(dataset, synth_params, size, redundant, noise, classification)
@@ -46,16 +48,16 @@ def experiment(dataset, synth_params, size, scale_data, redundant, noise, nb_del
     nb_safe_dg_all = 0
     
     while compt_exp < nb_exp:
-        random.seed(compt_exp)
-        np.random.seed(compt_exp)
+        random.seed(compt_exp + 1)
+        np.random.seed(compt_exp + 1)
         compt_exp += 1
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
         screener_ell = EllipsoidScreener(lmbda=lmbda, mu=mu, loss=loss, penalty=penalty, 
                                             intercept=intercept, classification=classification, 
                                             n_ellipsoid_steps=n_ellipsoid_steps, 
-                                            better_init=better_init, better_radius=better_radius, 
-                                            cut=cut, clip_ell=clip_ell)
-        screener_dg = DualityGapScreener(lmbda=lmbda, n_epochs=n_epochs_dg)
+                                            better_init=0, better_radius=0, 
+                                            cut=cut, clip_ell=clip_ell, use_sphere=use_sphere)
+        screener_dg = DualityGapScreener(lmbda=lmbda, n_epochs=better_init)
 
         if scale_data:
             scaler = StandardScaler()
@@ -65,12 +67,31 @@ def experiment(dataset, synth_params, size, scale_data, redundant, noise, nb_del
         if get_ell_from_subset != 0:
             random_subset = random.sample(range(0, X_train.shape[0]), get_ell_from_subset)
             screener_dg.fit(X_train[random_subset], y_train[random_subset])
+            if screener_dg.squared_radius < X_train.shape[1]:
+                rad = screener_dg.squared_radius
+            else:
+                rad = X_train.shape[1]
+            if better_init == 0:
+                init = None
+            else:
+                init = screener_dg.z.reshape(-1,)
             screener_ell.fit(X_train[random_subset], y_train[random_subset], 
-                                                    init=screener_dg.z.reshape(-1,), rad=screener_dg.squared_radius)
+                                                    init=init, rad=rad)
+            screener_dg = DualityGapScreener(lmbda=lmbda, n_epochs=n_epochs_dg).fit(X_train[random_subset], y_train[random_subset])
         else:
             screener_dg.fit(X_train, y_train)
-            screener_ell.fit(X_train, y_train, init=screener_dg.z.reshape(-1,), 
-                                                    rad=screener_dg.squared_radius)
+            if screener_dg.squared_radius < X_train.shape[1]:
+                rad = screener_dg.squared_radius
+            else:
+                rad = X_train.shape[1]
+            if better_init == 0:
+                init = None
+            else:
+                init = screener_dg.z.reshape(-1,)
+            screener_ell.fit(X_train, y_train, init=init, rad=rad)
+            screener_dg = DualityGapScreener(lmbda=lmbda, n_epochs=n_epochs_dg).fit(X_train, y_train)
+                                            
+        print('SQUARED RADIUS OF THE DUALITY GAP BALL :', screener_dg.squared_radius)
             
         scores_screendg = screener_dg.screen(X_train, y_train)
         scores_screenell = screener_ell.screen(X_train, y_train)
@@ -79,7 +100,7 @@ def experiment(dataset, synth_params, size, scale_data, redundant, noise, nb_del
         idx_screenell = np.argsort(scores_screenell)
 
         print('SCORES_DG', scores_screendg[:10])
-        print('SCORES_ELL', len(scores_screenell))
+        print('SCORES_ELL', scores_screenell[:10])
 
         nb_safe_ell = get_nb_safe(scores_screenell, mu, classification)
         nb_safe_ell_all += nb_safe_ell
@@ -194,11 +215,12 @@ if __name__ == '__main__':
     parser.add_argument('--intercept', action='store_true')
     parser.add_argument('--classif_score', action='store_true', help='determines the score that is used')
     parser.add_argument('--n_ellipsoid_steps', default=1000, type=int, help='number of iterations of the ellipsoid method')
-    parser.add_argument('--better_init', default=0, type=int, help='KEEP DEFAULT IF COMPARING TO THE BASELINE, number of optimizer gradient steps to initialize the center of the ellipsoid')
-    parser.add_argument('--better_radius', default=0, type=float, help='KEEP DEFAULT IF COMPARING TO THE BASELINE, radius of the initial l2 ball')
+    parser.add_argument('--better_init', default=0, type=int, help='number of optimizer gradient steps to initialize the center of the ellipsoid')
+    parser.add_argument('--better_radius', default=0, type=float, help='DEPRECATED, radius of the initial l2 ball')
     parser.add_argument('--cut_ell', action='store_true', help='cut the final ellipsoid in half using a subgradient of the loss')
     parser.add_argument('--get_ell_from_subset', default=0, type=int, help='train the ellipsoid on a random subset of the dataset')
     parser.add_argument('--clip_ell', action='store_true', help='clip the eigenvalues of the ellipsoid')
+    parser.add_argument('--use_sphere', action='store_true', help='the region is a sphere whose radius is the smallest semi-axe of the ellipsoid')
     parser.add_argument('--n_epochs_dg', default=5, type=int, help='number of epochs of the solver in the duality gap baseline for screening')
     parser.add_argument('--nb_exp', default=10, type=int)
     parser.add_argument('--nb_test', default=3, type=int)
@@ -207,10 +229,9 @@ if __name__ == '__main__':
     parser.add_argument('--dontsave', action='store_true', help='do not save your experiment, but no plot possible')
     args = parser.parse_args()
 
-    print('START')
 
     experiment(args.dataset, args.synth_params, args.size, args.scale_data, args.redundant, args.noise, 
                 args.nb_delete_steps, args.lmbda, args.mu, args.classification, args.loss, args.penalty, 
                 args.intercept, args.classif_score, args.n_ellipsoid_steps, args.better_init, 
-                args.better_radius, args.cut_ell, args.get_ell_from_subset, args.clip_ell, args.n_epochs_dg, 
-                args.nb_exp, args.nb_test, args.plot, args.zoom, args.dontsave)
+                args.better_radius, args.cut_ell, args.get_ell_from_subset, args.clip_ell, args.use_sphere,
+                args.n_epochs_dg, args.nb_exp, args.nb_test, args.plot, args.zoom, args.dontsave)

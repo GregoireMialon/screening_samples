@@ -9,6 +9,7 @@ from screening.safelog import SafeLogistic
 from sklearn.svm import LinearSVC
 from sklearn.linear_model import Lasso, LogisticRegression
 
+
 def fit_estimator(X, y, loss, penalty, mu, lmbda, intercept, max_iter=10000):
     if loss == 'truncated_squared' and penalty == 'l1':
         estimator = Lasso(alpha=lmbda, fit_intercept=intercept, 
@@ -79,6 +80,16 @@ def compute_safe_logistic_gradient(u, mu):
             g[i] = np.exp(u[i] + threshold - 1) - 1
     return g
 
+def compute_loss(z, X, y, loss, penalty, lmbda, mu):
+    if loss == 'squared_hinge':
+        pred = X.dot(z)
+        if pred.shape == (X.shape[0],) and y.shape == (X.shape[0],):
+            loss = compute_squared_hinge(u=y * pred, mu=mu)
+        else:
+            raise ValueError('pred does not have the right shape')
+    if penalty == 'l2':
+        reg = np.linalg.norm(z)
+    return loss + (lmbda / 2) * reg
 
 def compute_subgradient(x, D, y, lmbda, mu, loss, penalty, intercept):
     if loss == 'truncated_squared':
@@ -121,51 +132,11 @@ def compute_A_g(scaling, L, I_k_vec, g):
     return A_g
 
 
-#@profile
-def iterate_ellipsoids_accelerated(D, y, z_init, r_init, lmbda, mu, loss, penalty, n_steps, intercept):
-    if intercept:
-        X = np.concatenate((D, np.ones(D.shape[0]).reshape(1,-1).T), axis=1)
-    else:
-        X = D
-    start = time.time()
-    k = 0
-    z = z_init
-    p = z_init.size
-    s = p ** 2 / (p ** 2 - 1)
-    scaling = r_init * (s ** (n_steps))
-
-    while k < n_steps:
-        g = compute_subgradient(z, X, y, lmbda, mu, loss, penalty, intercept)
-        if k == 0:
-            A_g = r_init * g
-            den = np.sqrt(g.dot(A_g))
-            A_g = (1 / den) * A_g 
-            z = z - (1 / (p + 1)) * A_g
-            A_g = A_g.reshape(1,-1)
-            L = A_g.T
-            I_k_vec = s * (2 / (p + 1)) * np.ones(1)
-        else:
-            A_g = compute_A_g(r_init * (s ** k), L, I_k_vec, g)
-            den = np.sqrt(g.dot(A_g))
-            A_g = (1 / den) * A_g
-            z = z - (1 / (p + 1)) * A_g
-            A_g = A_g.reshape(1,-1)
-            L = np.concatenate((L, A_g.T), axis=1)
-            I_k_vec = np.insert(I_k_vec, 0, (s ** (k + 1)) * (2 / (p + 1)))
-        k += 1
- 
-    g = compute_subgradient(z, X, y, lmbda, mu, loss, penalty, intercept)
-
-    end = time.time()
-    print('Time to compute z, A and g:', end - start)
-    return z, scaling, L, I_k_vec, g
-
-
 def compute_test_accelerated(D_i, y_i, z, scaling, L, I_k_vec, g, classification, cut):
-    A_g = compute_A_g(scaling, L, I_k_vec, g)
     A_D_i = compute_A_g(scaling, L, I_k_vec, D_i)
     if classification:
         if cut:
+            A_g = compute_A_g(scaling, L, I_k_vec, g)
             nu = - g.dot(A_D_i) / g.dot(A_g)
             if nu < 0:
                 test = D_i.dot(z) - np.sqrt(D_i.dot(A_D_i))
@@ -180,6 +151,7 @@ def compute_test_accelerated(D_i, y_i, z, scaling, L, I_k_vec, g, classification
 
     else:
         if cut:
+            A_g = compute_A_g(scaling, L, I_k_vec, g)
             nu = g.dot(A_D_i) / g.dot(A_g)
             if nu < 0:
                 test = D_i.dot(z) + np.sqrt(D_i.dot(A_D_i)) - y_i
@@ -195,43 +167,9 @@ def compute_test_accelerated(D_i, y_i, z, scaling, L, I_k_vec, g, classification
     return test
 
 
-def test_dataset_accelerated(D, y, lmbda, mu, classification, loss, penalty, n_steps, intercept, cut):
-    if intercept:
-        X = np.concatenate((D, np.ones(D.shape[0]).reshape(1,-1).T), axis=1)
-        z_init = np.zeros(X.shape[1] + 1)
-        r_init = np.sqrt(X.shape[1] + 1)
-    else:
-        X = D
-        z_init = np.zeros(X.shape[1])
-        r_init = np.sqrt(X.shape[1])
-    z, scaling, L, I_k_vec, _ = iterate_ellipsoids_accelerated(X, y, z_init, r_init, lmbda, mu, 
-        loss, penalty, n_steps, intercept)
-    results = np.zeros(X.shape[0])
-    g = compute_subgradient(z, X, y, lmbda, mu, loss, penalty, intercept)
-    start = time.time()
-    if classification:
-        for i in range(X.shape[0]):
-            x_i = y[i] * X[i]
-            test = compute_test_accelerated(x_i, y[i], z, scaling, L, I_k_vec, g, 
-                classification, cut)
-            if test > mu:
-                results[i] = 1
-    else:
-        for i in range(X.shape[0]):
-            test_1 = compute_test_accelerated(X[i], y[i], z, scaling, L, I_k_vec, g, 
-                classification, cut)
-            test_2 = compute_test_accelerated(-X[i],-y[i],z,scaling, L, I_k_vec, g, 
-                classification, cut)
-            if test_1 < mu and test_2 < mu:
-                results[i] = 1
-    end = time.time()
-    print('Time to test the entire dataset:', end - start)
-    return results
-
-
 def rank_dataset_accelerated(D, y, z, scaling, L, I_k_vec, g, mu, classification, intercept, cut):
     '''
-    Gives score to each sample, do not re-order the dataset
+    Gives score to each sample, does not re-order the dataset
     '''
     if intercept:
         X = np.concatenate((D, np.ones(D.shape[0]).reshape(1,-1).T), axis=1)
@@ -239,8 +177,6 @@ def rank_dataset_accelerated(D, y, z, scaling, L, I_k_vec, g, mu, classification
         X = D
     scores = np.zeros(X.shape[0])
     
-    start = time.time()
-
     if classification:
         for i in range(X.shape[0]):
             x_i = y[i] * X[i]
@@ -253,8 +189,6 @@ def rank_dataset_accelerated(D, y, z, scaling, L, I_k_vec, g, mu, classification
             test_2 = compute_test_accelerated(-X[i], -y[i], z, scaling, L, I_k_vec, g,
                 classification, cut)
             scores[i] = np.maximum(test_1, test_2)
-    end = time.time()
-    print('Time to rank the entire dataset:', end - start)
     return scores
 
 
@@ -299,8 +233,6 @@ def rank_dataset(D, y, z, A, g, mu, classification, intercept, cut):
         X = D
     scores = np.zeros(X.shape[0])
     
-    start = time.time()
-
     if classification:
         for i in range(X.shape[0]):
             x_i = y[i] * X[i]
@@ -312,6 +244,4 @@ def rank_dataset(D, y, z, A, g, mu, classification, intercept, cut):
             test_2 = compute_test(-X[i], -y[i], z, A, g,
                 classification, cut)
             scores[i] = np.maximum(test_1, test_2)
-    end = time.time()
-    print('Time to rank the entire dataset:', end - start)
     return scores

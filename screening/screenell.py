@@ -4,7 +4,8 @@ from screening.screentools import (
     rank_dataset, 
     rank_dataset_accelerated, 
     compute_subgradient, 
-    compute_A_g
+    compute_A_g,
+    compute_loss
 )
 import time 
 import random
@@ -12,7 +13,8 @@ import random
 class EllipsoidScreener:
 
     def __init__(self, lmbda, mu, loss, penalty, intercept, classification, n_ellipsoid_steps, 
-                    better_init, better_radius, cut, clip_ell, sgd=False):
+                    better_init, better_radius, cut, clip_ell, sgd=False, acceleration=True, dc=False,
+                    use_sphere=False):
 
         self.lmbda = lmbda
         self.mu = mu
@@ -26,15 +28,88 @@ class EllipsoidScreener:
         self.cut = cut
         self.clip_ell = clip_ell
         self.sgd = sgd
+        self.acceleration = acceleration
+        self.dc = dc
+        self.use_sphere = use_sphere
+        self.g = None
+
+    #@profile   
+    def update_ell(self, z, A, g):
+        p = z.size
+        A_g = A.dot(g)
+        den = np.sqrt(g.dot(A_g))
+        g = (1 / den) * g
+        A_g = A.dot(g)
+        z = z - (1 / (p + 1)) * A_g
+        A = (p ** 2 / (p ** 2 - 1)) * (A - (2 / (p + 1)) * np.outer(A_g, A_g))
+        return z, A
 
     #@profile
-    def iterate_ellipsoids_accelerated(self, D, y, z_init, r_init):
+    def iter_ell(self, X, y, z_init, r_init):
+        k = 0
+        z = z_init
+        A = r_init * np.identity(X.shape[1])
+        if self.sgd:
+            random_subset = np.arange(X.shape[0])
+            while k < self.n_steps:
+                random.shuffle(random_subset)
+                for i in range(X.shape[0]):
+                    g = compute_subgradient(z, X[random_subset[i]].reshape(1,-1), np.array(y[random_subset[i]]), 
+                                            self.lmbda, self.mu, self.loss, self.penalty, self.intercept)
+                    z, A = self.update_ell(z, A, g)
+                k += 1 
+                print(k)
+        else:
+            while k < self.n_steps:
+                g = compute_subgradient(z, X, y, self.lmbda, self.mu, self.loss, self.penalty, self.intercept)
+                z, A = self.update_ell(z, A, g)
+                k += 1 
+        
+        self.z = z
+        self.A = A
+
+        return
+    
+    #@profile   
+    def update_ell_dc(self, z, A, g, f_best, f_):
+        p = z.size
+        A_g = A.dot(g)
+        den = np.sqrt(g.dot(A_g))
+        alpha = (f_ - f_best) / den
+        g = (1 / den) * g
+        A_g = A.dot(g)
+        z = z - ((1 + p * alpha) / (p + 1)) * A_g
+        A = (p ** 2 / (p ** 2 - 1)) * (1 - alpha ** 2) * (A - ((2 * (1 + p * alpha)) / ((p + 1) * (1 + alpha))) * np.outer(A_g, A_g))
+        return z, A
+
+    #@profile
+    def iter_ell_dc(self, X, y, z_init, r_init):
+        k = 0
+        z = z_init
+        A = r_init * np.identity(X.shape[1])
+        while k < self.n_steps:
+            g = compute_subgradient(z, X, y, self.lmbda, self.mu, self.loss, self.penalty, self.intercept)
+            f_ = compute_loss(z, X, y, self.loss, self.penalty, self.lmbda, self.mu)
+            if k == 0:
+                f_best = f_
+            else:
+                if f_ < f_best:
+                    f_best = f_
+            z, A = self.update_ell_dc(z, A, g, f_best, f_)
+            k += 1 
+        
+        self.z = z
+        self.A = A
+
+        return
+
+    #@profile
+    def iter_ell_accelerated(self, D, y, z_init, r_init):
 
         if self.intercept:
             X = np.concatenate((D, np.ones(D.shape[0]).reshape(1,-1).T), axis=1)
         else:
             X = D
-        start = time.time()
         k = 0
         z = z_init
         p = z_init.size
@@ -60,7 +135,6 @@ class EllipsoidScreener:
                         a_g_list.append(A_g.T)
                         I_k_vec = s * (2 / (p + 1)) * np.ones(1)
                     else:
-                        #import pdb; pdb.set_trace()
                         temp = np.concatenate([a_g for a_g in a_g_list], axis=1)
                         A_g = compute_A_g(r_init * (s ** k), temp, I_k_vec, g)
                         den = np.sqrt(g.dot(A_g))
@@ -76,6 +150,7 @@ class EllipsoidScreener:
                 print(k)
             L = np.concatenate([a_g for a_g in a_g_list], axis=1)
 
+        
         else:
             while k < self.n_steps:
                 g = compute_subgradient(z, X, y, self.lmbda, self.mu, self.loss, self.penalty, self.intercept)
@@ -96,14 +171,16 @@ class EllipsoidScreener:
                     L = np.concatenate((L, A_g.T), axis=1)
                     I_k_vec = np.insert(I_k_vec, 0, (s ** (k + 1)) * (2 / (p + 1)))
                 k += 1
+        
+        self.z = z
+        self.scaling = scaling
+        self.L = L
+        self.I_k_vec = I_k_vec
+        self.r_init = r_init
     
-        g = compute_subgradient(z, X, y, self.lmbda, self.mu, self.loss, self.penalty, self.intercept)
-
-        end = time.time()
-        print('Time to compute z, A and g:', end - start)
-        return z, scaling, L, I_k_vec, g
+        return 
     
-    def get_ellipsoid(self, X, y, init, rad):
+    def get_ell(self, X, y, init, rad):
 
         if self.intercept:
             z_init = np.zeros(X.shape[1] + 1)
@@ -122,31 +199,56 @@ class EllipsoidScreener:
                 z_init = est.coef_
                 if self.intercept:
                     z_init = np.append(z_init, est.intercept_)
+
         if init is not None and self.better_init == 0:
             z_init = init
+
         if rad != 0 and self.better_radius == 0:
             r_init = rad
+
         if self.better_radius != 0:
-            r_init = float(self.better_radius)                            
-        z, scaling, L, I_k_vec, g = self.iterate_ellipsoids_accelerated(X, y, z_init, r_init)
-        return z, scaling, L, I_k_vec, g, r_init
+            r_init = float(self.better_radius)
+
+        if self.acceleration:                            
+            self.iter_ell_accelerated(X, y, z_init, r_init)
+        elif self.dc:
+            self.iter_ell_dc(X, y, z_init, r_init)
+        else:
+            self.iter_ell(X, y, z_init, r_init)
+        
+        return
     
     def fit(self, X_train, y_train, init=None, rad=0):
+        start = time.time()
 
-        self.z, self.scaling, self.L, self.I_k_vec, self.g, self.r_init = self.get_ellipsoid(X_train, y_train, init, rad)
-        if self.clip_ell:
+        self.get_ell(X_train, y_train , init, rad)
+
+        if self.acceleration and self.clip_ell:
             self.I_k_vec = self.I_k_vec.reshape(-1,1)
             A = self.scaling * np.identity(X_train.shape[1]) - self.L.dot(np.multiply(self.I_k_vec, np.transpose(self.L)))
             eigenvals, eigenvect = np.linalg.eigh(A)
             eigenvals = np.clip(eigenvals, 0, self.r_init)
             eigenvals = eigenvals.reshape(-1,1)
             self.A = eigenvect.dot(np.multiply(eigenvals, np.transpose(eigenvect)))
+        
+        if self.acceleration and self.use_sphere:
+            self.I_k_vec = self.I_k_vec.reshape(-1,1)
+            A = self.scaling * np.identity(X_train.shape[1]) - self.L.dot(np.multiply(self.I_k_vec, np.transpose(self.L)))
+            eigenvals, eigenvect = np.linalg.eigh(A)
+            r_min = np.amin(eigenvals)
+            self.A = r_min * np.identity(X_train.shape[1])
+
+        if self.cut:
+            self.g = compute_subgradient(self.z, X_train, y_train, self.lmbda, self.mu, self.loss, self.penalty, self.intercept)
+
+        end = time.time()
+        print('Time to fit EllipsoidScreener :', end - start)
 
         return self
 
     def screen(self, X, y):
 
-        if self.clip_ell:
+        if self.clip_ell or not(self.acceleration) or self.use_sphere:
             self.scores = rank_dataset(X, y, self.z, self.A, self.g,
                                     self.mu, self.classification, self.intercept, self.cut)
         else:
@@ -162,12 +264,16 @@ if __name__ == "__main__":
     
     X, y = load_experiment(dataset='mnist', synth_params=None, size=1000, redundant=0, 
                             noise=None, classification=True)
+    
+    random.seed(0)
+    np.random.seed(0)
+
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
     z_init = np.random.rand(X_train.shape[1])
-    screener = EllipsoidScreener(lmbda=0.0001, mu=1, loss='squared_hinge', penalty='l2', 
-                                intercept=False, classification=True, n_ellipsoid_steps=10, 
+    screener = EllipsoidScreener(lmbda=0.01, mu=1, loss='squared_hinge', penalty='l2', 
+                                intercept=False, classification=True, n_ellipsoid_steps=1000, 
                                 better_init=0, better_radius=0, cut=False, clip_ell=False, 
-                                sgd=False).fit(X_train, y_train, init=z_init, rad=10)
+                                sgd=False, acceleration=True, dc=False, use_sphere=False).fit(X_train, y_train)
     scores = screener.screen(X_train, y_train)
-    print('SCORES', scores[:10], 'CENTER', screener.z[:20])
+    print('N_EPOCHS', screener.n_steps, '\nSCORES', scores[:10], '\nCENTER', screener.z[:20])
   

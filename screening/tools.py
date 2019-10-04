@@ -145,13 +145,6 @@ def compute_ellipsoid_volume(radius):
     return num / den
 
 
-def random_screening_old(X, y, nb_points_to_keep):
-    while X.shape[0] > nb_points_to_keep:
-        i = randint(0,X.shape[0]-1)
-        X = np.delete(X, i, 0)
-        y = np.delete(y, i, 0)
-    return X, y
-
 def random_screening(X, y, nb_points_to_keep):
     idx_to_keep = sample(range(0, X.shape[0]), nb_points_to_keep)
     return X[idx_to_keep], y[idx_to_keep]
@@ -216,51 +209,61 @@ def scoring_interval_regression(y, y_predict, y_predict_screened, mu):
 
 
 def plot_experiment(data, margin=False, train_set_size=None, zoom=None):
-    data = data.item()
     if type(data).__name__ != 'dict':
         if len(data) >= 6:
-            train_set_size = data[5]
+            train_set_size = data[6]
         nb_to_del_table = data[0] / train_set_size
         scores_regular_all = np.array(cut_list(data[1]))
-        scores_screened_all = np.array(cut_list(data[2]))
-        scores_r_all = np.array(cut_list(data[3]))
-        safe_fraction = data[4] / train_set_size
+        print(np.array(cut_list(data[1])))
+        scores_screenell_all = np.array(cut_list(data[2]))
+        scores_screendg_all = np.array(cut_list(data[3]))
+        scores_r_all = np.array(cut_list(data[4]))
+        safe_fraction = data[5] / train_set_size
+        
     else:
         nb_to_del_table = data['nb_to_del_table'] / data['train_set_size']
         scores_regular_all = np.array(cut_list(data['scores_regular']))
-        scores_screened_all = np.array(cut_list(data['scores_ell']))
+        scores_screenell_all = np.array(cut_list(data['scores_ell']))
+        print(scores_screenell_all)
+        scores_screendg_all = np.array(cut_list(data['scores_dg']))
+        print(scores_screendg_all)
         scores_r_all = np.array(cut_list(data['scores_r']))
-        safe_fraction = data['nb_safe_ell'] / data['train_set_size']
-
+        safe_ell_fraction = data['nb_safe_ell'] / data['train_set_size']
+        safe_dg_fraction = data['nb_safe_dg'] / data['train_set_size']
+    
     scores_regular_mean = np.mean(scores_regular_all, 0)
-    scores_screened_mean = np.mean(scores_screened_all, 0)
+    scores_screenell_mean = np.mean(scores_screenell_all, 0)
+    scores_screendg_mean = np.mean(scores_screendg_all, 0)
     scores_r_mean = np.mean(scores_r_all, 0)
 
     scores_regular_var = np.sqrt(np.var(scores_regular_all, 0))
-    scores_screened_var = np.sqrt(np.var(scores_screened_all, 0))
+    scores_screenell_var = np.sqrt(np.var(scores_screenell_all, 0))
+    scores_screendg_var = np.sqrt(np.var(scores_screendg_all, 0))
     scores_r_var = np.sqrt(np.var(scores_r_all, 0))
 
     fig, ax1 = plt.subplots(figsize=(14, 8))
 
     a = ax1.errorbar(nb_to_del_table[:len(scores_regular_mean)], scores_regular_mean, yerr=scores_regular_var, linewidth=5, capsize=10, 
                      markeredgewidth=5)
-    b = ax1.errorbar(nb_to_del_table[:len(scores_regular_mean)], scores_screened_mean, yerr=scores_screened_var, linewidth=5, capsize=10, 
+    b = ax1.errorbar(nb_to_del_table[:len(scores_regular_mean)], scores_screenell_mean, yerr=scores_screenell_var, linewidth=5, capsize=10, 
                      markeredgewidth=5, color='orange')
-    c = ax1.errorbar(nb_to_del_table[:len(scores_regular_mean)], scores_r_mean, yerr=scores_r_var, linewidth=5, capsize=10, markeredgewidth=5, 
+    c = ax1.errorbar(nb_to_del_table[:len(scores_regular_mean)], scores_screendg_mean, yerr=scores_screendg_var, linewidth=5, capsize=10, 
+                     markeredgewidth=5, color='purple')
+    d = ax1.errorbar(nb_to_del_table[:len(scores_regular_mean)], scores_r_mean, yerr=scores_r_var, linewidth=5, capsize=10, markeredgewidth=5, 
                      color='mediumseagreen')
-    ax1.legend([a, b, c], ["Trained on whole dataset", "Trained on screened dataset", "Trained on random subset"],
+    ax1.legend([a, b, c, d], ["Trained on whole dataset", "Trained on screenell dataset", "Trained on screendg dataset", "Trained on random subset"],
                 prop={"size": 25})
     if margin:
         scores_margin_all = np.array(cut_list(data[6]))
         scores_margin_mean = np.mean(scores_margin_all, 0)
         scores_margin_var = np.sqrt(np.var(scores_margin_all, 0))
         d = ax1.errorbar(nb_to_del_table[:len(scores_regular_mean)], scores_margin_mean, yerr=scores_margin_var, linewidth=5, capsize=10, markeredgewidth=5)
-        ax1.legend([a, b, c, d], ["Trained on whole dataset", "Trained on screened dataset", "Trained on random subset", "Trained on margin subset"],
+        ax1.legend([a, b, c, d], ["Trained on whole dataset", "Trained on screenll dataset", "Trained on random subset", "Trained on margin subset"],
                 prop={"size": 25})
     if zoom !=None:
         ax1.set_ylim(zoom)
     
-    ax1.set_xlabel('Fraction of points deleted (SAFE until {})'.format(safe_fraction), fontsize=45)
+    ax1.set_xlabel('Fraction of samples deleted. Safe ell : {}, Safe dg : {}'.format(safe_ell_fraction, safe_dg_fraction), fontsize=45)
     ax1.set_ylabel('Score on test set', fontsize=45)
     ax1.tick_params('y', labelsize=30)
     ax1.tick_params('x', labelsize=30)
@@ -268,55 +271,6 @@ def plot_experiment(data, margin=False, train_set_size=None, zoom=None):
     #ax1.legend()
     plt.grid(color='white', linewidth=3)
     ax1.set_facecolor('whitesmoke')
-    plt.show()
-    return
-
-def plot_experiment_simultaneous(datas, param_name, param_values, train_set_size=None, classification=True,
-                                 zoom=None):
-
-    fig, ax1 = plt.subplots(figsize=(14, 8))
-    my_axes = []
-
-    for data in datas:
-        if len(data) == 6:
-            train_set_size = data[5]
-        nb_to_del_table = data[0] / train_set_size
-        scores_regular_all = np.array(cut_list(data[1]))
-        scores_screened_all = np.array(cut_list(data[2]))
-        scores_r_all = np.array(cut_list(data[3]))
-        safe_fraction = data[4] / train_set_size
-        
-        scores_regular_mean = np.mean(scores_regular_all, 0)
-        scores_screened_mean = np.mean(scores_screened_all, 0)
-        scores_r_mean = np.mean(scores_r_all, 0)
-
-        scores_regular_var = np.sqrt(np.var(scores_regular_all, 0))
-        scores_screened_var = np.sqrt(np.var(scores_screened_all, 0))
-        scores_r_var = np.sqrt(np.var(scores_r_all, 0))
-        my_axes.append(ax1.errorbar(nb_to_del_table[:len(scores_screened_mean)], scores_screened_mean, yerr=scores_screened_var, linewidth=5, capsize=10, 
-                     markeredgewidth=5))
-    
-    for k, my_axe in enumerate(my_axes):
-        ax1.legend(my_axe, "Trained on screened dataset ({} = {})".format(param_name, param_values[k]), prop={"size": 25})
-   
-    a = ax1.errorbar(nb_to_del_table[:len(scores_regular_mean)], scores_regular_mean, yerr=scores_regular_var, linewidth=5, capsize=10, 
-                     markeredgewidth=5)
-    b = ax1.errorbar(nb_to_del_table[:len(scores_regular_mean)], scores_r_mean, yerr=scores_r_var, linewidth=5, capsize=10, markeredgewidth=5, 
-                     color='mediumseagreen')
-    ax1.legend([a, b], ["Trained on whole dataset", "Trained on random subset"],
-                prop={"size": 25})
-    
-    if zoom !=None:
-        ax1.set_ylim(zoom)
-    
-    ax1.set_xlabel('Fraction of points deleted (SAFE until {})'.format(safe_fraction), fontsize=45)
-    if classification:
-        ax1.set_ylabel('Accuracy on test set', fontsize=45)
-    else:
-        ax1.set_ylabel('R^2 score on test set', fontsize=45)
-    ax1.tick_params('y', labelsize=30)
-    ax1.tick_params('x', labelsize=30)
-    fig.tight_layout()
     plt.show()
     return
 

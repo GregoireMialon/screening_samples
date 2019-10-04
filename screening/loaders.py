@@ -34,7 +34,6 @@ def load_20newsgroups():
 def load_mnist(pb=1):
     mat = loadmat(DATASETS_PATH + 'ckn_mnist.mat')
     X = mat['psiTr'].T
-    print('Shape of original MNIST', X.shape)
     y = mat['Ytr']
     y = np.array(y, dtype=int).reshape(y.shape[0])
     for i in range(len(y)):

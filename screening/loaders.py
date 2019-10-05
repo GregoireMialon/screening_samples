@@ -9,6 +9,7 @@ from screening.tools import (
     make_redundant_data_classification
 )
 from screening.settings import DATASETS_PATH
+import hdf5storage
 
 
 def load_leukemia():
@@ -32,6 +33,7 @@ def load_20newsgroups():
     return X, y
 
 def load_mnist(pb=1):
+    print('Loading MNIST features ...')
     mat = loadmat(DATASETS_PATH + 'ckn_mnist.mat')
     X = mat['psiTr'].T
     y = mat['Ytr']
@@ -41,7 +43,15 @@ def load_mnist(pb=1):
             y[i] = - 1
         else:
             y[i] = 1
-    #X, y = balanced_subsample(X, y)
+    print(' ... Done !')
+    return X, y
+
+def load_svhn():
+    print('Loading SVHN features ...')
+    mat = hdf5storage.loadmat(DATASETS_PATH + 'svhn_ckn.mat')
+    X = mat['psiTr'].T
+    y = mat['Ytr'].reshape(-1,)
+    print(' ... Done !')
     return X, y
 
 def load_higgs():
@@ -91,3 +101,8 @@ def load_experiment(dataset, synth_params, size, redundant, noise, classificatio
         X = X[:int(size)]
         y = y[:int(size)]
     return X, y
+
+if __name__ == "__main__":
+    X, y = load_svhn()
+    print(X.shape, y.shape)
+    print(np.unique(y, return_counts=True))

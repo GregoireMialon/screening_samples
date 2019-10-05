@@ -221,22 +221,27 @@ class EllipsoidScreener:
     def fit(self, X_train, y_train, init=None, rad=0):
         start = time.time()
 
-        self.get_ell(X_train, y_train , init, rad)
+        if self.n_steps == 0:
+            self.z = init
+            self.A = rad * np.identity(X_train.shape[1])
+        else:
+            self.get_ell(X_train, y_train , init, rad)
 
-        if self.acceleration and self.clip_ell:
-            self.I_k_vec = self.I_k_vec.reshape(-1,1)
-            A = self.scaling * np.identity(X_train.shape[1]) - self.L.dot(np.multiply(self.I_k_vec, np.transpose(self.L)))
-            eigenvals, eigenvect = np.linalg.eigh(A)
-            eigenvals = np.clip(eigenvals, 0, self.r_init)
-            eigenvals = eigenvals.reshape(-1,1)
-            self.A = eigenvect.dot(np.multiply(eigenvals, np.transpose(eigenvect)))
-        
-        if self.acceleration and self.use_sphere:
-            self.I_k_vec = self.I_k_vec.reshape(-1,1)
-            A = self.scaling * np.identity(X_train.shape[1]) - self.L.dot(np.multiply(self.I_k_vec, np.transpose(self.L)))
-            eigenvals, eigenvect = np.linalg.eigh(A)
-            r_min = np.amin(eigenvals)
-            self.A = r_min * np.identity(X_train.shape[1])
+            if self.acceleration and self.clip_ell:
+                self.I_k_vec = self.I_k_vec.reshape(-1,1)
+                A = self.scaling * np.identity(X_train.shape[1]) - self.L.dot(np.multiply(self.I_k_vec, np.transpose(self.L)))
+                eigenvals, eigenvect = np.linalg.eigh(A)
+                eigenvals = np.clip(eigenvals, 0, self.r_init)
+                eigenvals = eigenvals.reshape(-1,1)
+                self.A = eigenvect.dot(np.multiply(eigenvals, np.transpose(eigenvect)))
+            
+            if self.acceleration and self.use_sphere:
+                self.I_k_vec = self.I_k_vec.reshape(-1,1)
+                A = self.scaling * np.identity(X_train.shape[1]) - self.L.dot(np.multiply(self.I_k_vec, np.transpose(self.L)))
+                eigenvals, eigenvect = np.linalg.eigh(A)
+                r_min = np.amin(eigenvals)
+                self.A = r_min * np.identity(X_train.shape[1])
+                print('Using minimal sphere of ellipsoid')
 
         if self.cut:
             self.g = compute_subgradient(self.z, X_train, y_train, self.lmbda, self.mu, self.loss, self.penalty, self.intercept)
@@ -248,7 +253,7 @@ class EllipsoidScreener:
 
     def screen(self, X, y):
 
-        if self.clip_ell or not(self.acceleration) or self.use_sphere:
+        if self.clip_ell or not(self.acceleration) or self.use_sphere or self.n_steps == 0:
             self.scores = rank_dataset(X, y, self.z, self.A, self.g,
                                     self.mu, self.classification, self.intercept, self.cut)
         else:
@@ -270,10 +275,12 @@ if __name__ == "__main__":
 
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
     z_init = np.random.rand(X_train.shape[1])
+    print(z_init)
+    rad = 10
     screener = EllipsoidScreener(lmbda=0.01, mu=1, loss='squared_hinge', penalty='l2', 
-                                intercept=False, classification=True, n_ellipsoid_steps=1000, 
+                                intercept=False, classification=True, n_ellipsoid_steps=0, 
                                 better_init=0, better_radius=0, cut=False, clip_ell=False, 
-                                sgd=False, acceleration=True, dc=False, use_sphere=False).fit(X_train, y_train)
+                                sgd=True, acceleration=False, dc=False, use_sphere=False).fit(X_train, y_train, None, rad)
     scores = screener.screen(X_train, y_train)
-    print('N_EPOCHS', screener.n_steps, '\nSCORES', scores[:10], '\nCENTER', screener.z[:20])
+    print('N_EPOCHS :', screener.n_steps, '\nSCORES :', scores[:10], '\nCENTER :', screener.z[:20], '\nELLIPSOID :', screener.A)
   

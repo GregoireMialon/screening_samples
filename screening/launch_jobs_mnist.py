@@ -7,12 +7,12 @@ from screening.settings import LOGS_PATH
 
 
 mus = [1.0]
-lmbdas = [0.001, 0.01]
-n_ellipsoid_stepss = [10, 100, 1000]
-better_inits = [0, 1, 3, 10]
+lmbdas = [0.0001, 0.001, 0.01, 0.1, 1.0]
+n_ellipsoid_stepss = [480]
+better_inits = [16]
 sizes = [60000]
-sub_ells = [0, 100, 1000]
-n_dgs = [1, 3, 10]
+sub_ells = [100]
+n_dgs = [20]
 
 parallel_args = []
 for (mu, lmbda, n_ellipsoid_steps, better_init, size, sub_ell, n_dg) in itertools.product(

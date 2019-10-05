@@ -66,7 +66,7 @@ def experiment(dataset, synth_params, size, scale_data, redundant, noise, nb_del
 
         if get_ell_from_subset != 0:
             random_subset = random.sample(range(0, X_train.shape[0]), get_ell_from_subset)
-            screener_dg.fit(X_train[random_subset], y_train[random_subset])
+            screener_dg.fit(X_train, y_train)
             if screener_dg.squared_radius < X_train.shape[1]:
                 rad = screener_dg.squared_radius
             else:
@@ -77,7 +77,7 @@ def experiment(dataset, synth_params, size, scale_data, redundant, noise, nb_del
                 init = screener_dg.z.reshape(-1,)
             screener_ell.fit(X_train[random_subset], y_train[random_subset], 
                                                     init=init, rad=rad)
-            screener_dg = DualityGapScreener(lmbda=lmbda, n_epochs=n_epochs_dg).fit(X_train[random_subset], y_train[random_subset])
+            screener_dg = DualityGapScreener(lmbda=lmbda, n_epochs=n_epochs_dg).fit(X_train, y_train)
         else:
             screener_dg.fit(X_train, y_train)
             if screener_dg.squared_radius < X_train.shape[1]:
@@ -112,7 +112,6 @@ def experiment(dataset, synth_params, size, scale_data, redundant, noise, nb_del
         scores_dg = []
         scores_r = []
 
-        #nb_to_del_table = np.linspace(1, X_train.shape[0], nb_delete_steps, dtype='int')
         nb_to_del_table = np.sqrt(np.linspace(1, X_train.shape[0], nb_delete_steps, dtype='int'))
         nb_to_del_table = np.ceil(nb_to_del_table * (X_train.shape[0] / nb_to_del_table[-1])).astype(int)
 

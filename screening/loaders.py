@@ -51,6 +51,7 @@ def load_svhn():
     mat = hdf5storage.loadmat(DATASETS_PATH + 'svhn_ckn.mat')
     X = mat['psiTr'].T
     y = mat['Ytr'].reshape(-1,)
+    y = np.array([1 if label == 1 else -1 for label in y])
     print(' ... Done !')
     return X, y
 
@@ -84,6 +85,8 @@ def load_experiment(dataset, synth_params, size, redundant, noise, classificatio
         X, y = load_mnist()
     elif dataset == 'higgs':
         X, y = load_higgs()
+    elif dataset == 'svhn':
+        X, y = load_svhn()
     elif dataset == 'synthetic':
         X, y, _, _ = make_data(synth_params[0], synth_params[1], synth_params[2]) #old params: 100, 2, 0.5
         #print('TRUE SYNTHETIC PARAMETERS', true_params)
@@ -97,12 +100,12 @@ def load_experiment(dataset, synth_params, size, redundant, noise, classificatio
         dataset+= '_redundant'
         X, y = make_redundant_data_classification(X, y, int(redundant))
 
-    if size != None:
-        X = X[:int(size)]
-        y = y[:int(size)]
+    if size != X.shape[0]:
+        X = X[:size]
+        y = y[:size]
     return X, y
 
 if __name__ == "__main__":
-    X, y = load_svhn()
+    X, y = load_experiment(dataset='svhn', synth_params=None, size=604388, redundant=0, noise=None, classification=True)
     print(X.shape, y.shape)
     print(np.unique(y, return_counts=True))

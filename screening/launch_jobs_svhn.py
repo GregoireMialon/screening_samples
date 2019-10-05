@@ -7,20 +7,21 @@ from screening.settings import LOGS_PATH
 
 
 mus = [1.0]
-lmbdas = [0.0001, 0.001, 0.01, 0.1, 1.0]
-n_ellipsoid_stepss = [1920]
-sizes = [60000]
-sub_ells = [100]
-init_dgs = [(10, 14), (12, 16), (14, 18), (16, 20), (18, 22)]
+lmbdas = [0.001, 0.01, 0.1]
+n_ellipsoid_stepss = [10, 100, 1000]
+better_inits = [0, 1, 15]
+sizes = [604388]
+sub_ells = [0, 100, 1000]
+n_dgs = [2, 16]
 
 parallel_args = []
-for (mu, lmbda, n_ellipsoid_steps, size, sub_ell, init_dg) in itertools.product(
-    mus, lmbdas, n_ellipsoid_stepss, sizes, sub_ells, init_dgs):
+for (mu, lmbda, n_ellipsoid_steps, better_init, size, sub_ell, n_dg) in itertools.product(
+    mus, lmbdas, n_ellipsoid_stepss, better_inits, sizes, sub_ells, n_dgs):
 	args = {
 		'mu': mu,
 		'lmbda': lmbda,
 		'n_ellipsoid_steps': n_ellipsoid_steps,
-		'dataset': 'mnist',
+		'dataset': 'svhn',
 		'size': size,
 		'redundant': 0,
 		'penalty': 'l2',
@@ -30,11 +31,11 @@ for (mu, lmbda, n_ellipsoid_steps, size, sub_ell, init_dg) in itertools.product(
 		'classif_score': True,
 		'loss': 'squared_hinge',
 		'classification': True,
-		'better_init': init_dg[0],
+		'better_init': better_init,
 		'get_ell_from_subset': sub_ell,
 		'use_sphere': True,
-		'cut': True,
-		'n_epochs_dg': init_dg[1],
+		#'cut': True,
+		'n_epochs_dg': n_dg,
 		'zoom': 0
 		}
 	parallel_args.append(args)
@@ -59,7 +60,7 @@ apt_run(
         shell_var=shell_vars,
         prepend_cmd=prepend_cmd,
         group_by=1,
-        memory=20000,
-        memory_hard=20000,
-        max_parrallel_jobs=40,
+        memory=30000,
+        memory_hard=50000,
+        max_parrallel_jobs=5,
         multi_threading=1)

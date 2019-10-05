@@ -1,35 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import sklearn
 from scipy.sparse import rand
 import random
 import time
 from sklearn.model_selection import train_test_split
-from screening.safelog import SafeLogistic
-from sklearn.svm import LinearSVC
-from sklearn.linear_model import Lasso, LogisticRegression
 
-
-def fit_estimator(X, y, loss, penalty, mu, lmbda, intercept, max_iter=10000):
-    if loss == 'truncated_squared' and penalty == 'l1':
-        estimator = Lasso(alpha=lmbda, fit_intercept=intercept, 
-                        max_iter=max_iter).fit(X, y)
-    elif loss == 'squared' and penalty == 'l1':
-        estimator = Lasso(alpha=lmbda, fit_intercept=intercept, 
-                        max_iter=max_iter).fit(X, y)
-    elif loss == 'hinge' and penalty == 'l2':
-        estimator = LinearSVC(C= 1 / lmbda, loss=loss, penalty=penalty, fit_intercept=intercept, 
-                        max_iter=max_iter).fit(X, y)
-    elif loss == 'squared_hinge' and penalty == 'l2':
-        estimator = LinearSVC(C= 1 / lmbda, loss=loss, dual=False, penalty=penalty, fit_intercept=intercept, 
-                        max_iter=max_iter).fit(X, y) 
-    elif loss == 'safe_logistic' and penalty == 'l2':
-        estimator = SafeLogistic(mu=mu, lmbda=lmbda, max_iter=max_iter).fit(X, y)
-    elif loss == 'logistic' and penalty == 'l2':
-        estimator = LogisticRegression(C=1/lmbda, fit_intercept=intercept).fit(X, y)            
-    else:
-    	print('ERROR, you picked a combination which is not implemented.')
-    return estimator
 
 #TODO : eliminate the loops
 def compute_truncated_squared_loss_gradient(u, mu):
@@ -63,22 +38,19 @@ def compute_squared_hinge_conjugate(u):
 
 
 def compute_l1_subgradient(u):
-    g = np.zeros(u.size)
-    for i in range(u.size):
-        if u[i] != 0:
-            g[i] = np.sign(u[i])
-        else:
-            g[i] = 2 * np.random.rand(1)[0] - 1
-    return g
+    return np.sign(u)
+
+
+def compute_safe_logistic(u, mu):
+    #we make a change of variable mu = 1 - mu w.r.t the actual formula
+    output = np.minimum(u - mu, 0)
+    return np.sum(np.exp(output) - output - np.ones(len(u)))
 
 
 def compute_safe_logistic_gradient(u, mu):
-    threshold = 1 - mu
-    g = np.zeros(u.size)
-    for i in range(u.size):
-        if u[i] < 1 - threshold:
-            g[i] = np.exp(u[i] + threshold - 1) - 1
-    return g
+    #we make a change of variable mu = 1 - mu w.r.t the actual formula
+    return np.exp(np.minimum(u - mu, 0)) - np.ones(len(u))
+    
 
 def compute_loss(z, X, y, loss, penalty, lmbda, mu):
     if loss == 'squared_hinge':
@@ -87,9 +59,18 @@ def compute_loss(z, X, y, loss, penalty, lmbda, mu):
             loss = compute_squared_hinge(u=y * pred, mu=mu)
         else:
             raise ValueError('pred does not have the right shape')
+    elif loss == 'safe_logistic':
+        pred = X.dot(z)
+        if pred.shape == (X.shape[0],) and y.shape == (X.shape[0],):
+            loss = compute_safe_logistic(u=y * pred, mu=mu) / X.shape[0]
+        else:
+            raise ValueError('pred does not have the right shape')
     if penalty == 'l2':
-        reg = np.linalg.norm(z)
-    return loss + (lmbda / 2) * reg
+        reg = (np.linalg.norm(z) ** 2) / 2
+    elif penalty == 'l1':
+        reg = np.linalg.norm(z, ord=1)
+    return loss + lmbda * reg
+
 
 def compute_subgradient(x, D, y, lmbda, mu, loss, penalty, intercept):
     if loss == 'truncated_squared':
@@ -118,10 +99,8 @@ def compute_subgradient(x, D, y, lmbda, mu, loss, penalty, intercept):
     elif penalty == 'l1':   
         g_2 = compute_l1_subgradient(x)
         if intercept:
-            g_2[D.shape[1]-1] = 0
-    #print('G1', g_1, 'G2', g_2)        
+            g_2[D.shape[1]-1] = 0       
     g = g_1 + lmbda * g_2
-    #print('SUBGRADIENT', g)
     return g
 
 

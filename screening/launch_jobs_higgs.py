@@ -58,7 +58,7 @@ apt_run(
         shell_var=shell_vars,
         prepend_cmd=prepend_cmd,
         group_by=1,
-        memory=20000,
-        memory_hard=20000,
-        max_parrallel_jobs=8,
+        memory=21000,
+        memory_hard=50000,
+        max_parrallel_jobs=20,
         multi_threading=1)

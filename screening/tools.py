@@ -197,6 +197,14 @@ def scoring_classif(estimator, X, y):
     return score / len(y)
 
 
+def scoring_screener(screener, X, y):
+    score = 0
+    for i in range(len(y)):
+        if screener.z.dot(X[i]) * y[i] > 0:
+            score += 1
+    return score / len(y)
+
+
 def scoring_interval_regression(y, y_predict, y_predict_screened, mu):
     score = 0
     score_screened = 0

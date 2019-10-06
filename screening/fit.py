@@ -18,8 +18,8 @@ def fit_estimator(X, y, loss, penalty, mu, lmbda, intercept, max_iter=10000):
                         max_iter=1000).fit(X, y) 
     elif loss == 'safe_logistic':
         estimator = SafeLogistic(mu=mu, lmbda=lmbda, penalty=penalty, max_iter=max_iter).fit(X, y)
-    elif loss == 'logistic' and penalty == 'l2':
-        estimator = LogisticRegression(C=1/lmbda, fit_intercept=intercept).fit(X, y)            
+    elif loss == 'logistic':
+        estimator = LogisticRegression(C=1/lmbda, penalty=penalty, fit_intercept=intercept).fit(X, y)            
     else:
     	print('ERROR, you picked a combination which is not implemented.')
     return estimator

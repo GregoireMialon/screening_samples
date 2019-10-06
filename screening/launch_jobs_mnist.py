@@ -11,7 +11,7 @@ lmbdas = [0.0001, 0.001, 0.01, 0.1, 1.0]
 n_ellipsoid_stepss = [1920]
 sizes = [60000]
 sub_ells = [100]
-init_dgs = [(10, 14), (12, 16), (14, 18), (16, 20), (18, 22)]
+init_dgs = [(1, 5), (5, 9), (10, 14), (15, 19), (20, 24), (25, 29), (30, 34), (35, 39)]
 
 parallel_args = []
 for (mu, lmbda, n_ellipsoid_steps, size, sub_ell, init_dg) in itertools.product(
@@ -24,7 +24,7 @@ for (mu, lmbda, n_ellipsoid_steps, size, sub_ell, init_dg) in itertools.product(
 		'size': size,
 		'redundant': 0,
 		'penalty': 'l2',
-		'nb_delete_steps': 12,
+		'nb_delete_steps': 8,
 		'nb_exp': 3,
 		'nb_test': 2,
 		'classif_score': True,

@@ -50,7 +50,12 @@ def compute_safe_logistic(u, mu):
 def compute_safe_logistic_gradient(u, mu):
     #we make a change of variable mu = 1 - mu w.r.t the actual formula
     return np.exp(np.minimum(u - mu, 0)) - np.ones(len(u))
+
+def compute_logistic(u):
+    return np.log(np.exp(-u) + 1)
     
+def compute_logistic_gradient(u):
+    return - np.exp(-u) / (np.exp(-u) + 1)
 
 def compute_loss(z, X, y, loss, penalty, lmbda, mu):
     if loss == 'squared_hinge':
@@ -81,16 +86,20 @@ def compute_subgradient(x, D, y, lmbda, mu, loss, penalty, intercept):
         output = D.dot(x) - y
         g_1 = (1 / D.shape[0]) * np.transpose(D).dot(output)
     elif loss == 'hinge':
-        output = y * D.dot(x)
+        output = y * (D.dot(x))
         g_1 = compute_hinge_subgradient(output, mu)
         g_1 = (np.transpose(D).dot(y * g_1))
     elif loss == 'squared_hinge':
-        output = y * D.dot(x)
+        output = y * (D.dot(x))
         g_1 = compute_squared_hinge_gradient(output, mu)
         g_1 = (np.transpose(D).dot(y * g_1))
-    elif loss == 'safe_logistic' or loss == 'logistic':
-        output = y * D.dot(x)
+    elif loss == 'safe_logistic':
+        output = y * (D.dot(x))
         g_1 = compute_safe_logistic_gradient(output, mu)
+        g_1 = (1 / D.shape[0]) * (np.transpose(D).dot(y * g_1))
+    elif loss == 'logistic':
+        output = y * (D.dot(x))
+        g_1 = compute_logistic_gradient(output)
         g_1 = (1 / D.shape[0]) * (np.transpose(D).dot(y * g_1))
     if penalty == 'l2':
         g_2 = np.copy(x)

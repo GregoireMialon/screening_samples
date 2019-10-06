@@ -1,11 +1,16 @@
 import numpy as np
 from screening.screentools import (
-    fit_estimator,
     rank_dataset, 
     rank_dataset_accelerated, 
     compute_subgradient, 
     compute_A_g,
     compute_loss
+)
+from screening.fit import (
+    fit_estimator
+)
+from screening.tools import (
+    scoring_screener
 )
 import time 
 import random
@@ -275,12 +280,15 @@ if __name__ == "__main__":
 
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
     z_init = np.random.rand(X_train.shape[1])
-    print(z_init)
-    rad = 10
-    screener = EllipsoidScreener(lmbda=0.01, mu=1, loss='squared_hinge', penalty='l2', 
-                                intercept=False, classification=True, n_ellipsoid_steps=0, 
+    #print(z_init)
+    #rad = 10
+    screener = EllipsoidScreener(lmbda=0.00001, mu=1, loss='logistic', penalty='l1', 
+                                intercept=False, classification=True, n_ellipsoid_steps=2000, 
                                 better_init=0, better_radius=0, cut=False, clip_ell=False, 
-                                sgd=True, acceleration=False, dc=False, use_sphere=False).fit(X_train, y_train, None, rad)
-    scores = screener.screen(X_train, y_train)
-    print('N_EPOCHS :', screener.n_steps, '\nSCORES :', scores[:10], '\nCENTER :', screener.z[:20], '\nELLIPSOID :', screener.A)
+                                sgd=False, acceleration=True, dc=False, use_sphere=False).fit(X_train, y_train)
+    prop = np.unique(y_test, return_counts=True)[1]
+    print('BASELINE : ', 1 - prop[1] / prop[0])
+    print(scoring_screener(screener, X_test, y_test))
+    #scores = screener.screen(X_train, y_train)
+    #print('N_EPOCHS :', screener.n_steps, '\nSCORES :', scores[:10]), '\nCENTER :', screener.z[:20]) #, '\nELLIPSOID :', screener.A)
   

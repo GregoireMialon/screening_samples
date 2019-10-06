@@ -33,9 +33,9 @@ def experiment(dataset, synth_params, size, scale_data, redundant, noise, nb_del
     
     print('START')
 
-    exp_title = 'X_size_{}_ell_subset_{}_loss_{}_lmbda_{}_n_ellipsoid_{}_intercept_{}_mu_{}_redundant_{}_noise_{}_better_init_{}_better_radius_{}_cut_ell_{}_clip_ell_{}_n_dg_{}_use_sphere_{}'.format(size, 
+    exp_title = 'X_size_{}_ell_subset_{}_loss_{}_lmbda_{}_n_ellipsoid_{}_intercept_{}_mu_{}_redundant_{}_noise_{}_better_init_{}_better_radius_{}_cut_ell_{}_clip_ell_{}_n_dg_{}_use_sphere_{}_nds_{}'.format(size, 
         get_ell_from_subset, loss, lmbda, n_ellipsoid_steps, intercept, mu, redundant, noise, better_init, 
-        better_radius, cut, clip_ell, n_epochs_dg, use_sphere)
+        better_radius, cut, clip_ell, n_epochs_dg, use_sphere, nb_delete_steps)
     print(exp_title)
 
     X, y = load_experiment(dataset, synth_params, size, redundant, noise, classification)
@@ -114,59 +114,62 @@ def experiment(dataset, synth_params, size, scale_data, redundant, noise, nb_del
         scores_dg = []
         scores_r = []
 
-        nb_to_del_table = np.sqrt(np.linspace(1, X_train.shape[0], nb_delete_steps, dtype='int'))
-        nb_to_del_table = np.ceil(nb_to_del_table * (X_train.shape[0] / nb_to_del_table[-1])).astype(int)
-
-        X_r = X_train
-        y_r = y_train
+        nb_to_del_table=None
         
-        for i, nb_to_delete in enumerate(nb_to_del_table):
-            if i == 0:
-                score_regular = 0
-            score_ell = 0
-            score_dg = 0
-            score_r = 0
-            compt = 0
-            
-            X_screenell, y_screenell = X_train[idx_screenell[nb_to_delete:]], y_train[idx_screenell[nb_to_delete:]]
-            X_screendg, y_screendg = X_train[idx_screendg[nb_to_delete:]], y_train[idx_screendg[nb_to_delete:]]
-            X_r, y_r = random_screening(X_r, y_r, X_train.shape[0] - nb_to_delete)
-            if not(dataset_has_both_labels(y_r)):
-                print('Warning, only one label in randomly screened dataset')
-            if not(dataset_has_both_labels(y_screenell)):
-                print('Warning, only one label in screenell dataset')
-            if not(dataset_has_both_labels(y_screendg)):
-                print('Warning, only one label in screendg dataset')
-            if not(dataset_has_both_labels(y_r) and dataset_has_both_labels(y_screenell) and dataset_has_both_labels(y_screendg)): 
-                break
-            print('X_train :', X_train.shape,'X_screenell :', X_screenell.shape, 'X_screendg : ', X_screendg.shape,
-                  'X_random : ', X_r.shape) 
-            while compt < nb_test:
-                compt += 1
-                if i == 0:
-                    estimator_regular = fit_estimator(X_train, y_train, loss, penalty, mu, lmbda, intercept)
-                estimator_screenell = fit_estimator(X_screenell, y_screenell, loss, penalty, mu, lmbda, 
-                intercept)
-                estimator_screendg = fit_estimator(X_screendg, y_screendg, loss, penalty, mu, lmbda, 
-                intercept)
-                estimator_r = fit_estimator(X_r, y_r, loss, penalty, mu, lmbda, intercept)
-                if classif_score:
-                    if i == 0:
-                        score_regular += scoring_classif(estimator_regular, X_test, y_test)
-                    score_ell += scoring_classif(estimator_screenell, X_test, y_test)
-                    score_dg += scoring_classif(estimator_screendg, X_test, y_test)
-                    score_r += scoring_classif(estimator_r, X_test, y_test)
-                else:
-                    if i == 0:
-                        score_regular += estimator_regular.score(X_test, y_test)
-                    score_ell += estimator_screenell.score(X_test, y_test)
-                    score_dg += estimator_screendg.score(X_test, y_test)
-                    score_r += estimator_r.score(X_test, y_test)
+        if nb_delete_steps != 0:
+            nb_to_del_table = np.sqrt(np.linspace(1, X_train.shape[0], nb_delete_steps, dtype='int'))
+            nb_to_del_table = np.ceil(nb_to_del_table * (X_train.shape[0] / nb_to_del_table[-1])).astype(int)
 
-            scores_regular.append(score_regular / nb_test)
-            scores_ell.append(score_ell / nb_test)
-            scores_dg.append(score_dg / nb_test)
-            scores_r.append(score_r / nb_test)
+            X_r = X_train
+            y_r = y_train
+            
+            for i, nb_to_delete in enumerate(nb_to_del_table):
+                if i == 0:
+                    score_regular = 0
+                score_ell = 0
+                score_dg = 0
+                score_r = 0
+                compt = 0
+                
+                X_screenell, y_screenell = X_train[idx_screenell[nb_to_delete:]], y_train[idx_screenell[nb_to_delete:]]
+                X_screendg, y_screendg = X_train[idx_screendg[nb_to_delete:]], y_train[idx_screendg[nb_to_delete:]]
+                X_r, y_r = random_screening(X_r, y_r, X_train.shape[0] - nb_to_delete)
+                if not(dataset_has_both_labels(y_r)):
+                    print('Warning, only one label in randomly screened dataset')
+                if not(dataset_has_both_labels(y_screenell)):
+                    print('Warning, only one label in screenell dataset')
+                if not(dataset_has_both_labels(y_screendg)):
+                    print('Warning, only one label in screendg dataset')
+                if not(dataset_has_both_labels(y_r) and dataset_has_both_labels(y_screenell) and dataset_has_both_labels(y_screendg)): 
+                    break
+                print('X_train :', X_train.shape,'X_screenell :', X_screenell.shape, 'X_screendg : ', X_screendg.shape,
+                    'X_random : ', X_r.shape) 
+                while compt < nb_test:
+                    compt += 1
+                    if i == 0:
+                        estimator_regular = fit_estimator(X_train, y_train, loss, penalty, mu, lmbda, intercept)
+                    estimator_screenell = fit_estimator(X_screenell, y_screenell, loss, penalty, mu, lmbda, 
+                    intercept)
+                    estimator_screendg = fit_estimator(X_screendg, y_screendg, loss, penalty, mu, lmbda, 
+                    intercept)
+                    estimator_r = fit_estimator(X_r, y_r, loss, penalty, mu, lmbda, intercept)
+                    if classif_score:
+                        if i == 0:
+                            score_regular += scoring_classif(estimator_regular, X_test, y_test)
+                        score_ell += scoring_classif(estimator_screenell, X_test, y_test)
+                        score_dg += scoring_classif(estimator_screendg, X_test, y_test)
+                        score_r += scoring_classif(estimator_r, X_test, y_test)
+                    else:
+                        if i == 0:
+                            score_regular += estimator_regular.score(X_test, y_test)
+                        score_ell += estimator_screenell.score(X_test, y_test)
+                        score_dg += estimator_screendg.score(X_test, y_test)
+                        score_r += estimator_r.score(X_test, y_test)
+
+                scores_regular.append(score_regular / nb_test)
+                scores_ell.append(score_ell / nb_test)
+                scores_dg.append(score_dg / nb_test)
+                scores_r.append(score_r / nb_test)
 
         scores_regular_all.append(scores_regular)
         scores_ell_all.append(scores_ell)

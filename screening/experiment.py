@@ -233,7 +233,7 @@ if __name__ == '__main__':
     parser.add_argument('--nb_exp', default=3, type=int)
     parser.add_argument('--nb_test', default=3, type=int)
     parser.add_argument('--plot', action='store_true')
-    parser.add_argument('--zoom', default=[0.2, 0.6], nargs='+', type=float, help='zoom in the final plot')
+    parser.add_argument('--zoom', default=[0, 1], nargs='+', type=float, help='zoom in the final plot')
     parser.add_argument('--dontsave', action='store_true', help='do not save your experiment, but no plot possible')
     args = parser.parse_args()
 

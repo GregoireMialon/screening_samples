@@ -46,6 +46,7 @@ class DualityGapScreener:
         dual_pred = np.dot(self.X_train.T * self.y_train, dual_coef)
         dual_loss = compute_squared_hinge_conjugate(dual_coef)
         dual_reg = (1 / (2 * self.lmbda)) * (np.linalg.norm(dual_pred) ** 2) 
+        self.loss = primal_loss + primal_reg
         self.dg = primal_loss + primal_reg + dual_loss + dual_reg
         return 
     
@@ -81,14 +82,20 @@ if __name__ == "__main__":
     from screening.loaders import load_experiment
     import random
 
-    X, y = load_experiment(dataset='mnist', synth_params=None, size=1000, redundant=0, 
+    X, y = load_experiment(dataset='mnist', synth_params=None, size=60000, redundant=0, 
                             noise=None, classification=True)
     random.seed(0)
     np.random.seed(0)
 
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
 
-    for epoch in [0]:
-        screener = DualityGapScreener(lmbda=0.01, n_epochs=epoch).fit(X_train, y_train)
-        screener.screen(X_train, y_train)
-        print('Duality Gap at Epoch {}'.format(epoch), screener.dg, screener.first_obj)
+    rate = 1
+    epoch = 10
+    while rate > 0.0001:
+        screener = DualityGapScreener(lmbda=0.0001, n_epochs=epoch).fit(X_train, y_train)
+        #screener.screen(X_train, y_train)
+        rate = screener.dg / screener.loss
+        epoch += 1
+        print(rate, epoch)
+    print(np.where(screener.z == 0))
+    #print('LMBDA', lmbda, 'Duality Gap at Epoch {}'.format(epoch), screener.dg, 'Duality Gap at Epoch {}'.format(epoch), screener.first_obj)

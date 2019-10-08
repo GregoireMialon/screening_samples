@@ -139,39 +139,39 @@ def experiment_reg(dataset, synth_params, size, scale_data, redundant, noise, nb
                 while compt < nb_test:
                     compt += 1
                     if i == 0:
-                        estimator_regular = fit_estimator(X_train, y_train, loss, penalty, mu, lmbda, intercept)
-                    estimator_screenell = fit_estimator(X_screenell, y_screenell, loss='logistic', penalty=penalty, mu=mu, lmbda=lmbda, 
+                        estimator_regular = fit_estimator(X_train, y_train, loss=loss, penalty, mu, lmbda, intercept)
+                    estimator_screenell = fit_estimator(X_screenell, y_screenell, loss=loss, penalty=penalty, mu=mu, lmbda=lmbda, 
                     intercept=intercept)
-                    estimator_screenell_noreg = fit_estimator(X_screenell_noreg, y_screenell_noreg, loss='logistic', penalty=penalty, mu=mu, lmbda=lmbda, 
+                    estimator_screenell_noreg = fit_estimator(X_screenell_noreg, y_screenell_noreg, loss=loss, penalty=penalty, mu=mu, lmbda=lmbda, 
                     intercept=intercept)
-                    estimator_screenell_newloss = fit_estimator(X_screenell, y_screenell, loss='safe_logistic', penalty=penalty, mu=mu, lmbda=lmbda, 
+                    #estimator_screenell_newloss = fit_estimator(X_screenell, y_screenell, loss=loss, penalty=penalty, mu=mu, lmbda=lmbda, 
                     intercept=intercept)
-                    estimator_r = fit_estimator(X_r, y_r, loss='logistic', penalty=penalty, mu=mu, lmbda=lmbda, intercept=intercept)
+                    estimator_r = fit_estimator(X_r, y_r, loss=loss, penalty=penalty, mu=mu, lmbda=lmbda, intercept=intercept)
                     if classif_score:
                         if i == 0:
                             score_regular += scoring_classif(estimator_regular, X_test, y_test)
                         score_ell += scoring_classif(estimator_screenell, X_test, y_test)
                         score_ell_noreg += scoring_classif(estimator_screenell_noreg, X_test, y_test)
-                        score_ell_newloss += scoring_classif(estimator_screenell_newloss, X_test, y_test)
+                        #score_ell_newloss += scoring_classif(estimator_screenell_newloss, X_test, y_test)
                         score_r += scoring_classif(estimator_r, X_test, y_test)
                     else:
                         if i == 0:
                             score_regular += estimator_regular.score(X_test, y_test)
                         score_ell += estimator_screenell.score(X_test, y_test)
                         score_ell_noreg += estimator_screenell_noreg.score(X_test, y_test)
-                        score_ell_newloss += estimator_screenell_newloss.score(X_test, y_test)
+                        #score_ell_newloss += estimator_screenell_newloss.score(X_test, y_test)
                         score_r += estimator_r.score(X_test, y_test)
 
                 scores_regular.append(score_regular / nb_test)
                 scores_ell.append(score_ell / nb_test)
                 scores_ell_noreg.append(score_ell_noreg / nb_test)
-                scores_ell_newloss.append(score_ell_newloss / nb_test)
+                #scores_ell_newloss.append(score_ell_newloss / nb_test)
                 scores_r.append(score_r / nb_test)
 
             scores_regular_all.append(scores_regular)
             scores_ell_all.append(scores_ell)
             scores_ell_noreg_all.append(scores_ell_noreg)
-            scores_ell_newloss_all.append(scores_ell_newloss)
+            #scores_ell_newloss_all.append(scores_ell_newloss)
             scores_r_all.append(scores_r)
 
     print('Number of datapoints we can safely screen with ellipsoid method:', nb_safe_ell_all / nb_exp)

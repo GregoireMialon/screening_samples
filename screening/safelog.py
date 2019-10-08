@@ -46,11 +46,13 @@ class SafeLogistic:
 if __name__ == "__main__":
     #we check that this penalty does well on MNIST
 
-    X, y = load_experiment(dataset='mnist', synth_params=None, size=60000, redundant=0, 
+    X, y = load_experiment(dataset='mnist', synth_params=None, size=1000, redundant=0, 
                             noise=None, classification=True)
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
-    for mu in [1.0]:
-        for lmbda in [0.0001]:
+    prop = np.unique(y_test, return_counts=True)[1]
+    print('BASELINE : ', 1 - prop[1] / prop[0])
+    for mu in [1.5, 10.0]:
+        for lmbda in [0.0001, 0.001, 0.01, 0.1, 1.0]:
             safelog = SafeLogistic(mu=mu, lmbda=lmbda, penalty='l1', max_iter=10000)
             safelog.fit(X_train, y_train)
             print('LMBDA:', lmbda, 'MU :', mu, scoring_classif(safelog, X_test, y_test))

@@ -20,6 +20,15 @@ class DualityGapScreener:
     def __init__(self, lmbda, n_epochs):
         self.lmbda = lmbda
         self.n_epochs = n_epochs
+
+
+    def get_first_obj(self, svc):
+        coef = svc.coef_.reshape(-1,)
+        pred = np.dot(self.X_train, coef) * self.y_train
+        primal_loss = compute_squared_hinge(u=pred, mu=1)
+        primal_reg = (self.lmbda / 2) * (np.linalg.norm(coef) ** 2)
+        self.first_obj = primal_loss + primal_reg
+        return 
     
 
     def get_duality_gap(self, svc):
@@ -37,18 +46,21 @@ class DualityGapScreener:
         dual_pred = np.dot(self.X_train.T * self.y_train, dual_coef)
         dual_loss = compute_squared_hinge_conjugate(dual_coef)
         dual_reg = (1 / (2 * self.lmbda)) * (np.linalg.norm(dual_pred) ** 2) 
-        self.duality_gap = primal_loss + primal_reg + dual_loss + dual_reg
-        return self.duality_gap
+        self.dg = primal_loss + primal_reg + dual_loss + dual_reg
+        return 
     
 
     def fit(self, X_train, y_train):
         start = time.time()
         self.X_train = X_train
         self.y_train = y_train
+        first_svc = LinearSVC(loss='squared_hinge', dual=False, C=1/self.lmbda, fit_intercept=False, 
+                            max_iter=0, tol=1.0e-20).fit(self.X_train, self.y_train)
+        self.get_first_obj(first_svc)
         svc = LinearSVC(loss='squared_hinge', dual=False, C=1/self.lmbda, fit_intercept=False, 
                             max_iter=self.n_epochs, tol=1.0e-20).fit(self.X_train, self.y_train)
         self.z = svc.coef_
-        self.dg = self.get_duality_gap(svc)
+        self.get_duality_gap(svc)
         self.squared_radius = 2 * self.dg / self.lmbda
         self.A = self.squared_radius * np.identity(self.X_train.shape[1])
         end = time.time()
@@ -69,7 +81,7 @@ if __name__ == "__main__":
     from screening.loaders import load_experiment
     import random
 
-    X, y = load_experiment(dataset='mnist', synth_params=None, size=60000, redundant=0, 
+    X, y = load_experiment(dataset='mnist', synth_params=None, size=1000, redundant=0, 
                             noise=None, classification=True)
     random.seed(0)
     np.random.seed(0)
@@ -79,4 +91,4 @@ if __name__ == "__main__":
     for epoch in [0]:
         screener = DualityGapScreener(lmbda=0.01, n_epochs=epoch).fit(X_train, y_train)
         screener.screen(X_train, y_train)
-        print('Duality Gap at Epoch {}'.format(epoch), screener.dg)
+        print('Duality Gap at Epoch {}'.format(epoch), screener.dg, screener.first_obj)

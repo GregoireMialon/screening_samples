@@ -6,36 +6,35 @@ from screening.pyapt import apt_run
 from screening.settings import LOGS_PATH
 
 
-mus = [1.0, 0.5, 0.0]
-lmbdas = [0.0001, 0.001, 0.01]
-n_ellipsoid_stepss = [10, 100, 1000, 10000]
-sizes = [60000]
+mus = [1.0]
+lmbdas = [0.0001, 0.001, 0.01, 0.1, 1.0]
+n_ellipsoid_stepss = [10, 100, 1000, 3000]
+sizes = [604388]
 sub_ells = [100]
-better_inits = [1, 3, 10]
-better_radiuss = [0]
+init_rads = [(10, 1000), (10, 100), (20, 100), (20, 10), (30, 10), (30, 1)]
 
 parallel_args = []
-for (mu, lmbda, n_ellipsoid_steps, size, sub_ell, better_init, better_radius) in itertools.product(
-    mus, lmbdas, n_ellipsoid_stepss, sizes, sub_ells, better_inits, better_radiuss):
+for (mu, lmbda, n_ellipsoid_steps, size, sub_ell, init_rad) in itertools.product(
+    mus, lmbdas, n_ellipsoid_stepss, sizes, sub_ells, init_rads):
 	args = {
 		'mu': mu,
 		'lmbda': lmbda,
 		'n_ellipsoid_steps': n_ellipsoid_steps,
-		'dataset': 'mnist',
+		'dataset': 'svhn',
 		'size': size,
 		'redundant': 0,
 		'penalty': 'l1',
-		'nb_delete_steps': 15,
+		'nb_delete_steps': 0,
 		'nb_exp': 3,
 		'nb_test': 2,
 		'classif_score': True,
-		'loss': 'logistic',
+		'loss': 'safe_logistic',
 		'classification': True,
-		'better_init': better_init,
-        'better_radius': better_radius,
+		'better_init': init_rad[0],
+        'better_radius': init_rad[1],
 		'get_ell_from_subset': sub_ell,
-		'use_sphere': True,
-		#'cut': True,
+		#'use_sphere': True,
+		'cut': True,
 		'zoom': 0
 		}
 	parallel_args.append(args)
@@ -51,7 +50,7 @@ paths = ('PATH', '/sequoia/data1/gmialon/miniconda/etc/profile.d/conda.sh')
 shell_vars = [conda_var, paths]
 prepend_cmd = ['source ~/.bashrc', cd_project_folder, conda_activate, 'which python']
 
-queues = ['all.q', 'bigmem.q', 'goodboy.q']
+queues = ['all.q', 'goodboy.q']
 python_cmd = '-m screening.experiment_reg'
 apt_run(
         python_cmd,
@@ -60,7 +59,7 @@ apt_run(
         shell_var=shell_vars,
         prepend_cmd=prepend_cmd,
         group_by=1,
-        memory=20000,
-        memory_hard=20000,
+        memory=50000,
+        memory_hard=50000,
         max_parrallel_jobs=40,
         multi_threading=1)

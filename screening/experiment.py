@@ -69,10 +69,12 @@ def experiment(dataset, synth_params, size, scale_data, redundant, noise, nb_del
         if get_ell_from_subset != 0:
             random_subset = random.sample(range(0, X_train.shape[0]), get_ell_from_subset)
             screener_dg.fit(X_train, y_train)
-            if screener_dg.squared_radius < X_train.shape[1]:
-                rad = screener_dg.squared_radius
-            else:
-                rad = X_train.shape[1]
+            #if screener_dg.squared_radius < X_train.shape[1]:
+            #    rad = screener_dg.squared_radius
+            print('INIT RADIUS :', screener_dg.squared_radius, X_train.shape[1], screener_dg.first_obj)
+            rad = np.min([screener_dg.squared_radius, X_train.shape[1], screener_dg.first_obj])
+            #else:
+            #    rad = X_train.shape[1]
             if better_init == 0:
                 init = None
             else:
@@ -82,10 +84,12 @@ def experiment(dataset, synth_params, size, scale_data, redundant, noise, nb_del
             screener_dg = DualityGapScreener(lmbda=lmbda, n_epochs=n_epochs_dg).fit(X_train, y_train)
         else:
             screener_dg.fit(X_train, y_train)
-            if screener_dg.squared_radius < X_train.shape[1]:
-                rad = screener_dg.squared_radius
-            else:
-                rad = X_train.shape[1]
+            #if screener_dg.squared_radius < X_train.shape[1]:
+            #    rad = screener_dg.squared_radius
+            #else:
+            #    rad = X_train.shape[1]
+            print('INIT RADIUS :', screener_dg.squared_radius, X_train.shape[1], screener_dg.first_obj)
+            rad = np.min([screener_dg.squared_radius, X_train.shape[1], screener_dg.first_obj])
             if better_init == 0:
                 init = None
             else:
@@ -171,10 +175,10 @@ def experiment(dataset, synth_params, size, scale_data, redundant, noise, nb_del
                 scores_dg.append(score_dg / nb_test)
                 scores_r.append(score_r / nb_test)
 
-        scores_regular_all.append(scores_regular)
-        scores_ell_all.append(scores_ell)
-        scores_dg_all.append(scores_dg)
-        scores_r_all.append(scores_r)
+            scores_regular_all.append(scores_regular)
+            scores_ell_all.append(scores_ell)
+            scores_dg_all.append(scores_dg)
+            scores_r_all.append(scores_r)
 
     print('Number of datapoints we can safely screen with ellipsoid method:', nb_safe_ell_all / nb_exp)
     print('Number of datapoints we can safely screen with duality gap method:', nb_safe_dg_all / nb_exp)

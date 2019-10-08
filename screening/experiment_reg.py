@@ -139,13 +139,13 @@ def experiment_reg(dataset, synth_params, size, scale_data, redundant, noise, nb
                 while compt < nb_test:
                     compt += 1
                     if i == 0:
-                        estimator_regular = fit_estimator(X_train, y_train, loss=loss, penalty, mu, lmbda, intercept)
+                        estimator_regular = fit_estimator(X_train, y_train, loss=loss, penalty=penalty, mu=mu, lmbda=lmbda, intercept=intercept)
                     estimator_screenell = fit_estimator(X_screenell, y_screenell, loss=loss, penalty=penalty, mu=mu, lmbda=lmbda, 
                     intercept=intercept)
                     estimator_screenell_noreg = fit_estimator(X_screenell_noreg, y_screenell_noreg, loss=loss, penalty=penalty, mu=mu, lmbda=lmbda, 
                     intercept=intercept)
                     #estimator_screenell_newloss = fit_estimator(X_screenell, y_screenell, loss=loss, penalty=penalty, mu=mu, lmbda=lmbda, 
-                    intercept=intercept)
+                    #intercept=intercept)
                     estimator_r = fit_estimator(X_r, y_r, loss=loss, penalty=penalty, mu=mu, lmbda=lmbda, intercept=intercept)
                     if classif_score:
                         if i == 0:

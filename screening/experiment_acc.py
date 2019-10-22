@@ -31,7 +31,7 @@ def experiment_acc(dataset, loss, penalty, lmbda):
 
     save_dataset_folder = os.path.join(RESULTS_PATH, 'accuracies')
     os.makedirs(save_dataset_folder, exist_ok=True)
-    np.save(os.path.join(save_dataset_folder, 'accuracies_dict'), acc)
+    np.save(os.path.join(save_dataset_folder, '{}_{}_{}_{}'.format(dataset, loss, penalty, lmbda)), acc)
     print('RESULTS SAVED!')
 
     return

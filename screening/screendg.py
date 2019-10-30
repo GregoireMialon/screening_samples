@@ -1,6 +1,8 @@
 from sklearn.svm import LinearSVC
+from sklearn.linear_model import SGDClassifier
 from screening.screentools import (
     rank_dataset,
+    rank_dataset_accelerated,
     compute_squared_hinge,
     compute_squared_hinge_gradient,
     compute_squared_hinge_conjugate
@@ -22,15 +24,6 @@ class DualityGapScreener:
         self.n_epochs = n_epochs
 
 
-    def get_first_obj(self, svc):
-        coef = svc.coef_.reshape(-1,)
-        pred = np.dot(self.X_train, coef) * self.y_train
-        primal_loss = compute_squared_hinge(u=pred, mu=1)
-        primal_reg = (self.lmbda / 2) * (np.linalg.norm(coef) ** 2)
-        self.first_obj = primal_loss + primal_reg
-        return 
-    
-
     def get_duality_gap(self, svc):
         '''
         Uses the trick in Sparse Coding for ML, Mairal, 2010, Appendix D.2.3.
@@ -38,32 +31,40 @@ class DualityGapScreener:
         The loss is not normalized by the number of samples.
         '''
         coef = svc.coef_.reshape(-1,)
-        pred = np.dot(self.X_train, coef) * self.y_train
+        pred = self.X_train.dot(coef) * self.y_train
         primal_loss = compute_squared_hinge(u=pred, mu=1)
         primal_reg = (self.lmbda / 2) * (np.linalg.norm(coef) ** 2)
         dual_coef = compute_squared_hinge_gradient(u=pred, mu=1)
-        #dual_coef = np.clip(dual_coef, a_min=None, a_max=0.0) #useless here
-        dual_pred = np.dot(self.X_train.T * self.y_train, dual_coef)
+        dual_pred = X_train.T.dot(self.y_train * dual_coef)
         dual_loss = compute_squared_hinge_conjugate(dual_coef)
         dual_reg = (1 / (2 * self.lmbda)) * (np.linalg.norm(dual_pred) ** 2) 
-        self.loss = primal_loss + primal_reg
-        self.dg = primal_loss + primal_reg + dual_loss + dual_reg
-        return 
+        loss = primal_loss + primal_reg
+        dg = primal_loss + primal_reg + dual_loss + dual_reg
+        return loss, dg
     
 
-    def fit(self, X_train, y_train):
+    def fit(self, X_train, y_train, init=None):
         start = time.time()
         self.X_train = X_train
         self.y_train = y_train
         first_svc = LinearSVC(loss='squared_hinge', dual=False, C=1/self.lmbda, fit_intercept=False, 
                             max_iter=0, tol=1.0e-20).fit(self.X_train, self.y_train)
-        self.get_first_obj(first_svc)
-        svc = LinearSVC(loss='squared_hinge', dual=False, C=1/self.lmbda, fit_intercept=False, 
+        if init is not None:
+            first_svc.coef_ = init
+        self.first_obj, self.first_dg = self.get_duality_gap(first_svc)
+        if init is not None:
+            svc = SGDClassifier(loss='squared_hinge', alpha=self.lmbda, l1_ratio=0, 
+                                fit_intercept=False, max_iter=self.n_epochs, warm_start=True)
+            svc.coef_ = init
+            svc.intercept_ = 0
+            svc.fit(X_train, y_train)
+        else:
+            svc = LinearSVC(loss='squared_hinge', dual=False, C=1/self.lmbda, fit_intercept=False, 
                             max_iter=self.n_epochs, tol=1.0e-20).fit(self.X_train, self.y_train)
         self.z = svc.coef_
-        self.get_duality_gap(svc)
+        self.loss, self.dg = self.get_duality_gap(svc)
         self.squared_radius = 2 * self.dg / self.lmbda
-        self.A = self.squared_radius * np.identity(self.X_train.shape[1])
+        #self.A = self.squared_radius * np.identity(self.X_train.shape[1])
         end = time.time()
         print('Time to fit DualityGapScreener :', end - start)
         return self
@@ -71,8 +72,11 @@ class DualityGapScreener:
 
     def screen(self, X, y):
         # tol must be small enough so that max_iter is attained
-        return rank_dataset(D=X, y=y, z=self.z.reshape(-1,), A=self.A, g=None, mu=1, 
-                            classification=True, intercept=False, cut=False)
+        #return rank_dataset(D=X, y=y, z=self.z.reshape(-1,), A=self.A, g=None, mu=1, 
+        #                    classification=True, intercept=False, cut=False)
+        return rank_dataset_accelerated(D=X, y=y, z=self.z.reshape(-1,), scaling=self.squared_radius, 
+                                        L=0, I_k_vec=0, g=None, mu=1, classification=True, intercept=False, 
+                                        cut=False)
     
 
 if __name__ == "__main__":
@@ -82,20 +86,19 @@ if __name__ == "__main__":
     from screening.loaders import load_experiment
     import random
 
-    X, y = load_experiment(dataset='mnist', synth_params=None, size=60000, redundant=0, 
+    X, y = load_experiment(dataset='mnist', synth_params=None, size=1000, redundant=0, 
                             noise=None, classification=True)
     random.seed(0)
     np.random.seed(0)
 
+    epoch=20
+
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
 
-    rate = 1
-    epoch = 10
-    while rate > 0.0001:
-        screener = DualityGapScreener(lmbda=0.0001, n_epochs=epoch).fit(X_train, y_train)
-        #screener.screen(X_train, y_train)
-        rate = screener.dg / screener.loss
-        epoch += 1
-        print(rate, epoch)
-    print(np.where(screener.z == 0))
-    #print('LMBDA', lmbda, 'Duality Gap at Epoch {}'.format(epoch), screener.dg, 'Duality Gap at Epoch {}'.format(epoch), screener.first_obj)
+    screener = DualityGapScreener(lmbda=1.0, n_epochs=epoch).fit(X_train, y_train)
+    print('DUALITY GAP LAMBDA 1.0 : ', screener.dg)
+    print(screener.screen(X_train, y_train))
+    #screener = DualityGapScreener(lmbda=0.9, n_epochs=1000).fit(X_train, y_train, init=screener.z)
+    #print('DUALITY GAP LAMBDA 0.9 : ', screener.dg)
+    #screener = DualityGapScreener(lmbda=0.8, n_epochs=1000).fit(X_train, y_train, init=screener.z)
+    #print('DUALITY GAP LAMBDA 0.8 : ', screener.dg)

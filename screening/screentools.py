@@ -114,14 +114,19 @@ def compute_subgradient(x, D, y, lmbda, mu, loss, penalty, intercept):
 
 
 def compute_A_g(scaling, L, I_k_vec, g):
-    L_g = np.dot(np.transpose(L), g)
-    I_k_L = np.multiply(I_k_vec, L_g)
-    A_g = scaling * g - L.dot(I_k_L)
+    if L is not 0 and I_k_vec is not 0:
+        if type(g).__name__ == 'csr_matrix':
+            g = g.toarray().reshape(-1,)
+        L_g = L.T.dot(g)
+        I_k_L = np.multiply(I_k_vec, L_g)
+        A_g = scaling * g - L.dot(I_k_L)
+    else:
+        A_g = scaling * g
     return A_g
 
 
 def compute_test_accelerated(D_i, y_i, z, scaling, L, I_k_vec, g, classification, cut):
-    A_D_i = compute_A_g(scaling, L, I_k_vec, D_i)
+    A_D_i = compute_A_g(scaling, L, I_k_vec, D_i).T
     if classification:
         if cut:
             A_g = compute_A_g(scaling, L, I_k_vec, g)
@@ -151,7 +156,6 @@ def compute_test_accelerated(D_i, y_i, z, scaling, L, I_k_vec, g, classification
                 test = D_i.dot(z) + body - y_i
         else:
             test = D_i.dot(z) + np.sqrt(D_i.dot(A_D_i)) - y_i
-    #print('LABEL', y_i, 'TEST', test)
     return test
 
 

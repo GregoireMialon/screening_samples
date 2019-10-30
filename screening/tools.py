@@ -1,6 +1,7 @@
 from sklearn.linear_model import Lasso, SGDClassifier
 from sklearn.svm import LinearSVC
 from sklearn.model_selection import GridSearchCV
+from sklearn.datasets import fetch_rcv1
 from random import randint, sample
 import random
 import numpy as np
@@ -9,6 +10,9 @@ from scipy.special import gamma
 from sklearn.utils import shuffle
 import matplotlib.pyplot as plt
 import argparse
+from screening.settings import DATASETS_PATH
+import os 
+from scipy.sparse import save_npz
 
 
 def make_data(n, p, sparsity, noise=True, save=False):
@@ -83,6 +87,20 @@ def make_redundant_data_classification(X, y, nb_points_to_add):
         y_redundant = np.append(y_redundant, -1)
 
     return X_redundant, y_redundant
+
+
+def make_rcv1_data():
+    print('Loading RCV1 features ...')
+    rcv1_dic = fetch_rcv1(subset='test')
+    X = rcv1_dic.data
+    y = rcv1_dic.target
+    save_npz(os.path.join(DATASETS_PATH, 'rcv1_X'), X)
+    y = y.todense()
+    y = np.array([1 if y_i[0][0,0] == 1 else -1 for y_i in y])
+    print(np.unique(y, return_counts=True))
+    np.save(os.path.join(DATASETS_PATH, 'rcv1_y'), y)
+    print(' ... Dataset created !')
+    return
 
 
 def balanced_subsample(x,y,subsample_size=1):
@@ -200,7 +218,8 @@ def scoring_classif(estimator, X, y):
 def scoring_screener(screener, X, y):
     score = 0
     for i in range(len(y)):
-        if screener.z.dot(X[i]) * y[i] > 0:
+        #import pdb; pdb.set_trace()
+        if X[i].dot(screener.z) * y[i] > 0:
             score += 1
     return score / len(y)
 
@@ -283,12 +302,14 @@ def plot_experiment(data, margin=False, train_set_size=None, zoom=None):
     return
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--n_samples', default=100, type=int)
-    parser.add_argument('--dimension', default=500, type=int)
-    parser.add_argument('--sparsity', default=10/500, type=float)
-    args = parser.parse_args()
+    #parser = argparse.ArgumentParser()
+    #parser.add_argument('--n_samples', default=100, type=int)
+    #parser.add_argument('--dimension', default=500, type=int)
+    #parser.add_argument('--sparsity', default=10/500, type=float)
+    #args = parser.parse_args()
 
-    make_data(args.n_samples, args.dimension, args.sparsity, noise=True, save=True)
+    #make_data(args.n_samples, args.dimension, args.sparsity, noise=True, save=True)
+
+    make_rcv1_data()
         
 

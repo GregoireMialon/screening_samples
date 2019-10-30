@@ -14,6 +14,14 @@ from screening.tools import (
 )
 import time 
 import random
+from scipy.sparse import (
+    csr_matrix,
+    diags,
+    identity,
+)
+from scipy.sparse.linalg import (
+    eigsh
+)
 
 class EllipsoidScreener:
 
@@ -110,7 +118,6 @@ class EllipsoidScreener:
 
     #@profile
     def iter_ell_accelerated(self, D, y, z_init, r_init):
-
         if self.intercept:
             X = np.concatenate((D, np.ones(D.shape[0]).reshape(1,-1).T), axis=1)
         else:
@@ -154,8 +161,6 @@ class EllipsoidScreener:
                 k += 1
                 print(k)
             L = np.concatenate([a_g for a_g in a_g_list], axis=1)
-
-        
         else:
             while k < self.n_steps:
                 g = compute_subgradient(z, X, y, self.lmbda, self.mu, self.loss, self.penalty, self.intercept)
@@ -186,7 +191,6 @@ class EllipsoidScreener:
         return 
     
     def get_ell(self, X, y, init, rad):
-
         if self.intercept:
             z_init = np.zeros(X.shape[1] + 1)
             r_init = X.shape[1] + 1
@@ -225,7 +229,6 @@ class EllipsoidScreener:
     
     def fit(self, X_train, y_train, init=None, rad=0):
         start = time.time()
-
         if self.n_steps == 0:
             self.z = init
             self.A = rad * np.identity(X_train.shape[1])
@@ -241,11 +244,15 @@ class EllipsoidScreener:
                 self.A = eigenvect.dot(np.multiply(eigenvals, np.transpose(eigenvect)))
             
             if self.acceleration and self.use_sphere:
+                #import pdb; pdb.set_trace()
                 self.I_k_vec = self.I_k_vec.reshape(-1,1)
-                A = self.scaling * np.identity(X_train.shape[1]) - self.L.dot(np.multiply(self.I_k_vec, np.transpose(self.L)))
-                eigenvals, eigenvect = np.linalg.eigh(A)
-                r_min = np.amin(eigenvals)
-                self.A = r_min * np.identity(X_train.shape[1])
+                if type(X_train).__name__ != 'csr_matrix':
+                    A = self.scaling * np.identity(X_train.shape[1]) - self.L.dot(np.multiply(self.I_k_vec, np.transpose(self.L)))
+                    eigenvals = np.linalg.eigvalsh(A)
+                else:
+                    A = self.scaling * identity(X_train.shape[1]) - csr_matrix(self.L.dot(np.multiply(self.I_k_vec, np.transpose(self.L))))
+                    eigenvals = eigsh(A, k=1, which='SM', return_eigenvectors=False)
+                self.squared_radius = eigenvals[0]
                 print('Using minimal sphere of ellipsoid')
 
         if self.cut:
@@ -257,9 +264,11 @@ class EllipsoidScreener:
         return self
 
     def screen(self, X, y):
-
-        if self.clip_ell or not(self.acceleration) or self.use_sphere or self.n_steps == 0:
+        if self.clip_ell or not(self.acceleration) or self.n_steps == 0:
             self.scores = rank_dataset(X, y, self.z, self.A, self.g,
+                                    self.mu, self.classification, self.intercept, self.cut)
+        elif self.use_sphere:
+            self.scores = rank_dataset_accelerated(X, y, self.z, self.squared_radius, 0, 0, self.g, 
                                     self.mu, self.classification, self.intercept, self.cut)
         else:
             self.scores = rank_dataset_accelerated(X, y, self.z, self.scaling, self.L, self.I_k_vec, self.g,
@@ -272,7 +281,7 @@ if __name__ == "__main__":
     from sklearn.model_selection import train_test_split
     from screening.loaders import load_experiment
     
-    X, y = load_experiment(dataset='mnist', synth_params=None, size=1000, redundant=0, 
+    X, y = load_experiment(dataset='svhn', synth_params=None, size=1000, redundant=0, 
                             noise=None, classification=True)
     
     random.seed(0)
@@ -282,13 +291,12 @@ if __name__ == "__main__":
     z_init = np.random.rand(X_train.shape[1])
     #print(z_init)
     #rad = 10
-    screener = EllipsoidScreener(lmbda=0.00001, mu=1, loss='logistic', penalty='l1', 
-                                intercept=False, classification=True, n_ellipsoid_steps=2000, 
+    screener = EllipsoidScreener(lmbda=0.01, mu=1, loss='squared_hinge', penalty='l2', 
+                                intercept=False, classification=True, n_ellipsoid_steps=1000, 
                                 better_init=0, better_radius=0, cut=False, clip_ell=False, 
-                                sgd=False, acceleration=True, dc=False, use_sphere=False).fit(X_train, y_train)
+                                sgd=False, acceleration=True, dc=False, use_sphere=True).fit(X_train, y_train)
     prop = np.unique(y_test, return_counts=True)[1]
     print('BASELINE : ', 1 - prop[1] / prop[0])
     print(scoring_screener(screener, X_test, y_test))
-    #scores = screener.screen(X_train, y_train)
+    print(screener.screen(X_train, y_train))
     #print('N_EPOCHS :', screener.n_steps, '\nSCORES :', scores[:10]), '\nCENTER :', screener.z[:20]) #, '\nELLIPSOID :', screener.A)
-  

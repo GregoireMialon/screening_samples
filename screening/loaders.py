@@ -10,7 +10,8 @@ from screening.tools import (
 )
 from screening.settings import DATASETS_PATH
 import hdf5storage
-
+import os
+from scipy.sparse import load_npz
 
 def load_leukemia():
     data = pd.read_csv(DATASETS_PATH + 'leukemia_big.csv')
@@ -55,12 +56,19 @@ def load_svhn():
     print(' ... Done !')
     return X, y
 
+def load_rcv1():
+    print('Loading RCV1 features ...')
+    X = load_npz(os.path.join(DATASETS_PATH, 'rcv1_X.npz'))
+    y = np.load(os.path.join(DATASETS_PATH, 'rcv1_y.npy'))
+    print(' ... Done !')
+    return X, y
+
 def load_higgs():
     dir_higgs = DATASETS_PATH + 'higgs'
     with open(dir_higgs, 'rb') as handle:
         data_higgs = pickle.load(handle)
     X = data_higgs[0]
-    y =data_higgs[1]
+    y = data_higgs[1]
     return X, y
 
 def load_synthetic(extension):
@@ -87,6 +95,8 @@ def load_experiment(dataset, synth_params, size, redundant, noise, classificatio
         X, y = load_higgs()
     elif dataset == 'svhn':
         X, y = load_svhn()
+    elif dataset == 'rcv1':
+        X, y = load_rcv1()
     elif dataset == 'synthetic':
         X, y, _, _ = make_data(synth_params[0], synth_params[1], synth_params[2]) #old params: 100, 2, 0.5
         #print('TRUE SYNTHETIC PARAMETERS', true_params)
@@ -106,6 +116,6 @@ def load_experiment(dataset, synth_params, size, redundant, noise, classificatio
     return X, y
 
 if __name__ == "__main__":
-    X, y = load_experiment(dataset='svhn', synth_params=None, size=604388, redundant=0, noise=None, classification=True)
-    print(X.shape, y.shape)
+    X, y = load_experiment(dataset='rcv1', synth_params=None, size=1000, redundant=0, noise=None, classification=True)
+    print(X[0], X.shape, y.shape)
     print(np.unique(y, return_counts=True))

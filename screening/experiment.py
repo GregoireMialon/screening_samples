@@ -4,7 +4,7 @@ from sklearn.model_selection import train_test_split
 from screening.tools import (
     make_data, make_redundant_data, make_redundant_data_classification, 
     balanced_subsample, random_screening, dataset_has_both_labels, get_nb_safe, 
-    scoring_classif, plot_experiment, screen_baseline_margin
+    plot_experiment, screen_baseline_margin
 )
 from screening.screentools import (
     rank_dataset_accelerated,

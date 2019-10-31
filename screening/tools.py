@@ -207,14 +207,6 @@ def get_nb_safe(scores, mu, classification):
     return nb_safe
 
 
-def scoring_classif(estimator, X, y):
-    score = 0
-    for i in range(len(y)):
-        if estimator.predict(X[i].reshape(1, -1))* y[i] > 0:
-            score += 1
-    return score / len(y)
-
-
 def scoring_screener(screener, X, y):
     score = 0
     for i in range(len(y)):
@@ -244,7 +236,6 @@ def plot_experiment(data, margin=False, train_set_size=None, zoom=None):
         scores_screenell_all = np.array(cut_list(data[2]))
         scores_screendg_all = np.array(cut_list(data[3]))
         scores_r_all = np.array(cut_list(data[4]))
-        #safe_fraction = data[5] / train_set_size
         
     else:
         nb_to_del_table = data['nb_to_del_table'] / data['train_set_size']

@@ -7,6 +7,7 @@ from screening.screentools import (
     compute_loss,
     compute_subgradient
 )
+import random
     
 
 class SafeLogistic:
@@ -40,23 +41,34 @@ class SafeLogistic:
     
     
     def predict(self, D):
-        return np.sign(np.dot(D, self.coef_[0]))
+        return np.sign(D.dot(self.coef_[0]))
+
+
+    def score(self, D, y):
+        outputs = self.predict(D) * y
+        outputs_ = [1 if output > 0 else 0 for output in outputs]
+        return np.sum(outputs_) / D.shape[0]
+
     
     
 if __name__ == "__main__":
-    #we check that this penalty does well on MNIST
-
-    X, y = load_experiment(dataset='mnist', synth_params=None, size=1000, redundant=0, 
+    #unit test
+    X, y = load_experiment(dataset='rcv1', synth_params=None, size=5000, redundant=0, 
                             noise=None, classification=True)
+
+    random.seed(0)
+    np.random.seed(0)
+
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
     prop = np.unique(y_test, return_counts=True)[1]
     print('BASELINE : ', 1 - prop[1] / prop[0])
-    for mu in [1.5, 10.0]:
+    for mu in [1, 3, 10]:
         for lmbda in [0.0001, 0.001, 0.01, 0.1, 1.0]:
-            safelog = SafeLogistic(mu=mu, lmbda=lmbda, penalty='l1', max_iter=10000)
-            safelog.fit(X_train, y_train)
-            print('LMBDA:', lmbda, 'MU :', mu, scoring_classif(safelog, X_test, y_test))
-    
+            for penalty in ['l1', 'l2']:
+                safelog = SafeLogistic(mu=mu, lmbda=lmbda, penalty=penalty, max_iter=10000)
+                safelog.fit(X_train, y_train)
+                print('LMBDA:', lmbda, 'MU :', mu, 'PENALTY', penalty, 'SCORE', safelog.score(X_test, y_test))
+        
 
 
     

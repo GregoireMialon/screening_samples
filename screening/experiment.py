@@ -69,12 +69,8 @@ def experiment(dataset, synth_params, size, scale_data, redundant, noise, nb_del
         if get_ell_from_subset != 0:
             random_subset = random.sample(range(0, X_train.shape[0]), get_ell_from_subset)
             screener_dg.fit(X_train, y_train)
-            #if screener_dg.squared_radius < X_train.shape[1]:
-            #    rad = screener_dg.squared_radius
             print('INIT RADIUS :', screener_dg.squared_radius, X_train.shape[1], screener_dg.first_obj)
             rad = np.min([screener_dg.squared_radius, X_train.shape[1], screener_dg.first_obj])
-            #else:
-            #    rad = X_train.shape[1]
             if better_init == 0:
                 init = None
             else:
@@ -84,10 +80,6 @@ def experiment(dataset, synth_params, size, scale_data, redundant, noise, nb_del
             screener_dg = DualityGapScreener(lmbda=lmbda, n_epochs=n_epochs_dg).fit(X_train, y_train)
         else:
             screener_dg.fit(X_train, y_train)
-            #if screener_dg.squared_radius < X_train.shape[1]:
-            #    rad = screener_dg.squared_radius
-            #else:
-            #    rad = X_train.shape[1]
             print('INIT RADIUS :', screener_dg.squared_radius, X_train.shape[1], screener_dg.first_obj)
             rad = np.min([screener_dg.squared_radius, X_train.shape[1], screener_dg.first_obj])
             if better_init == 0:
@@ -157,18 +149,11 @@ def experiment(dataset, synth_params, size, scale_data, redundant, noise, nb_del
                     estimator_screendg = fit_estimator(X_screendg, y_screendg, loss, penalty, mu, lmbda, 
                     intercept)
                     estimator_r = fit_estimator(X_r, y_r, loss, penalty, mu, lmbda, intercept)
-                    if classif_score:
-                        if i == 0:
-                            score_regular += scoring_classif(estimator_regular, X_test, y_test)
-                        score_ell += scoring_classif(estimator_screenell, X_test, y_test)
-                        score_dg += scoring_classif(estimator_screendg, X_test, y_test)
-                        score_r += scoring_classif(estimator_r, X_test, y_test)
-                    else:
-                        if i == 0:
-                            score_regular += estimator_regular.score(X_test, y_test)
-                        score_ell += estimator_screenell.score(X_test, y_test)
-                        score_dg += estimator_screendg.score(X_test, y_test)
-                        score_r += estimator_r.score(X_test, y_test)
+                    if i == 0:
+                        score_regular += estimator_regular.score(X_test, y_test)
+                    score_ell += estimator_screenell.score(X_test, y_test)
+                    score_dg += estimator_screendg.score(X_test, y_test)
+                    score_r += estimator_r.score(X_test, y_test)
 
                 scores_regular.append(score_regular / nb_test)
                 scores_ell.append(score_ell / nb_test)

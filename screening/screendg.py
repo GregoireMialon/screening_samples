@@ -35,7 +35,7 @@ class DualityGapScreener:
         primal_loss = compute_squared_hinge(u=pred, mu=1)
         primal_reg = (self.lmbda / 2) * (np.linalg.norm(coef) ** 2)
         dual_coef = compute_squared_hinge_gradient(u=pred, mu=1)
-        dual_pred = X_train.T.dot(self.y_train * dual_coef)
+        dual_pred = self.X_train.T.dot(self.y_train * dual_coef)
         dual_loss = compute_squared_hinge_conjugate(dual_coef)
         dual_reg = (1 / (2 * self.lmbda)) * (np.linalg.norm(dual_pred) ** 2) 
         loss = primal_loss + primal_reg

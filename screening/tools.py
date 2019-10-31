@@ -218,7 +218,6 @@ def scoring_classif(estimator, X, y):
 def scoring_screener(screener, X, y):
     score = 0
     for i in range(len(y)):
-        #import pdb; pdb.set_trace()
         if X[i].dot(screener.z) * y[i] > 0:
             score += 1
     return score / len(y)
@@ -245,7 +244,7 @@ def plot_experiment(data, margin=False, train_set_size=None, zoom=None):
         scores_screenell_all = np.array(cut_list(data[2]))
         scores_screendg_all = np.array(cut_list(data[3]))
         scores_r_all = np.array(cut_list(data[4]))
-        safe_fraction = data[5] / train_set_size
+        #safe_fraction = data[5] / train_set_size
         
     else:
         nb_to_del_table = data['nb_to_del_table'] / data['train_set_size']

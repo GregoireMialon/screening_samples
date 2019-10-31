@@ -27,7 +27,7 @@ import os
 
 #@profile
 def experiment(dataset, synth_params, size, scale_data, redundant, noise, nb_delete_steps, lmbda, mu, classification, 
-                loss, penalty, intercept, classif_score, n_ellipsoid_steps, better_init, 
+                loss, penalty, intercept, n_ellipsoid_steps, better_init, 
                 better_radius, cut, get_ell_from_subset, clip_ell, use_sphere, n_epochs_dg, nb_exp, nb_test, plot, zoom, 
                 dontsave):
     
@@ -206,7 +206,6 @@ if __name__ == '__main__':
     parser.add_argument('--loss', default='squared_hinge', choices=['hinge', 'squared_hinge', 'squared','truncated_squared', 'safe_logistic', 'logistic'])
     parser.add_argument('--penalty', default='l2', choices=['l1','l2'])
     parser.add_argument('--intercept', action='store_true')
-    parser.add_argument('--classif_score', action='store_true', help='determines the score that is used')
     parser.add_argument('--n_ellipsoid_steps', default=10, type=int, help='number of iterations of the ellipsoid method')
     parser.add_argument('--better_init', default=0, type=int, help='number of optimizer gradient steps to initialize the center of the ellipsoid')
     parser.add_argument('--better_radius', default=0, type=float, help='DEPRECATED, radius of the initial l2 ball')
@@ -225,6 +224,6 @@ if __name__ == '__main__':
 
     experiment(args.dataset, args.synth_params, args.size, args.scale_data, args.redundant, args.noise, 
                 args.nb_delete_steps, args.lmbda, args.mu, args.classification, args.loss, args.penalty, 
-                args.intercept, args.classif_score, args.n_ellipsoid_steps, args.better_init, 
+                args.intercept, args.n_ellipsoid_steps, args.better_init, 
                 args.better_radius, args.cut_ell, args.get_ell_from_subset, args.clip_ell, args.use_sphere,
                 args.n_epochs_dg, args.nb_exp, args.nb_test, args.plot, args.zoom, args.dontsave)

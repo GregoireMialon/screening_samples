@@ -110,12 +110,12 @@ def load_experiment(dataset, synth_params, size, redundant, noise, classificatio
         dataset+= '_redundant'
         X, y = make_redundant_data_classification(X, y, int(redundant))
 
-    if size != X.shape[0]:
+    if size <= X.shape[0]:
         X = X[:size]
         y = y[:size]
     return X, y
 
 if __name__ == "__main__":
-    X, y = load_experiment(dataset='rcv1', synth_params=None, size=1000, redundant=0, noise=None, classification=True)
+    X, y = load_experiment(dataset='rcv1', synth_params=None, size=1000000, redundant=0, noise=None, classification=True)
     print(X[0], X.shape, y.shape)
     print(np.unique(y, return_counts=True))

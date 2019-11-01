@@ -27,9 +27,8 @@ import os
 
 #@profile
 def experiment(dataset, synth_params, size, scale_data, redundant, noise, nb_delete_steps, lmbda, mu, classification, 
-                loss, penalty, intercept, n_ellipsoid_steps, better_init, 
-                better_radius, cut, get_ell_from_subset, clip_ell, use_sphere, n_epochs_dg, nb_exp, nb_test, plot, zoom, 
-                dontsave):
+                loss, penalty, intercept, n_ellipsoid_steps, better_init, better_radius, cut, get_ell_from_subset, clip_ell, 
+                use_sphere, guarantee, n_epochs_dg, nb_exp, nb_test, plot, zoom, dontsave):
     
     print('START')
 
@@ -44,6 +43,7 @@ def experiment(dataset, synth_params, size, scale_data, redundant, noise, nb_del
     scores_ell_all = []
     scores_dg_all = []
     scores_r_all = []
+    safe_guarantee = None
     
     compt_exp = 0
     nb_safe_ell_all = 0
@@ -111,7 +111,13 @@ def experiment(dataset, synth_params, size, scale_data, redundant, noise, nb_del
         scores_r = []
 
         nb_to_del_table=None
-        
+
+        if guarantee:
+            idx_safeell = np.where(scores_screenell < -mu)[0]
+            safe_guarantee = (fit_estimator(X_train, y_train, loss, penalty, mu, lmbda, intercept), 
+                              fit_estimator(X_train[idx_safeell], y_train[idx_safeell], loss, 
+                              penalty, mu, lmbda, intercept))
+
         if nb_delete_steps != 0:
             nb_to_del_table = np.sqrt(np.linspace(1, X_train.shape[0], nb_delete_steps, dtype='int'))
             nb_to_del_table = np.ceil(nb_to_del_table * (X_train.shape[0] / nb_to_del_table[-1])).astype(int)
@@ -176,7 +182,8 @@ def experiment(dataset, synth_params, size, scale_data, redundant, noise, nb_del
         'scores_r': scores_r_all,
         'nb_safe_ell': nb_safe_ell_all / nb_exp,
         'nb_safe_dg': nb_safe_dg_all / nb_exp,
-        'train_set_size': X_train.shape[0]
+        'train_set_size': X_train.shape[0],
+        'safe_guarantee': safe_guarantee / nb_exp
     }
     save_dataset_folder = os.path.join(RESULTS_PATH, dataset)
     os.makedirs(save_dataset_folder, exist_ok=True)
@@ -213,6 +220,7 @@ if __name__ == '__main__':
     parser.add_argument('--get_ell_from_subset', default=0, type=int, help='train the ellipsoid on a random subset of the dataset')
     parser.add_argument('--clip_ell', action='store_true', help='clip the eigenvalues of the ellipsoid')
     parser.add_argument('--use_sphere', action='store_true', help='the region is a sphere whose radius is the smallest semi-axe of the ellipsoid')
+    parser.add_argument('--guarantee', action='store_true', help='check whether the deleted points were safe')
     parser.add_argument('--n_epochs_dg', default=5, type=int, help='number of epochs of the solver in the duality gap baseline for screening')
     parser.add_argument('--nb_exp', default=3, type=int)
     parser.add_argument('--nb_test', default=3, type=int)
@@ -224,6 +232,6 @@ if __name__ == '__main__':
 
     experiment(args.dataset, args.synth_params, args.size, args.scale_data, args.redundant, args.noise, 
                 args.nb_delete_steps, args.lmbda, args.mu, args.classification, args.loss, args.penalty, 
-                args.intercept, args.n_ellipsoid_steps, args.better_init, 
-                args.better_radius, args.cut_ell, args.get_ell_from_subset, args.clip_ell, args.use_sphere,
-                args.n_epochs_dg, args.nb_exp, args.nb_test, args.plot, args.zoom, args.dontsave)
+                args.intercept, args.n_ellipsoid_steps, args.better_init, args.better_radius, args.cut_ell, 
+                args.get_ell_from_subset, args.clip_ell, args.use_sphere, args.guarantee, args.n_epochs_dg, 
+                args.nb_exp, args.nb_test, args.plot, args.zoom, args.dontsave)

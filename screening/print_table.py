@@ -5,10 +5,8 @@ from screening.settings import RESULTS_PATH
 
 def get_lmbda(filename):
     lmbda = re.findall('(?<=l2_).*?(?=.npy)', filename)
-    if lmbda is None:
+    if len(lmbda) == 0:
         lmbda = re.findall('(?<=l1_).*?(?=.npy)', filename)
-    if lmbda is None:
-        'LMBDA not found'
     return lmbda[0]
 
 def get_best_score(model, dataset):
@@ -61,7 +59,7 @@ def print_table(list_model, list_dataset):
     for i in range(n):
         for j in range(m):
             couple = get_best_score(list_model[i], list_dataset[j])
-            table[i][j] = couple[1] + '(' + couple[0] + ')'
+            table[i][j] = couple[1] + ' (' + couple[0] + ')'
 
     print(r'\begin{tabular}{ | l |', 'c | ' * m, '}')
     print(r'\hline')

@@ -2,7 +2,6 @@ from screening.fit import fit_estimator
 from screening.settings import RESULTS_PATH
 from screening.loaders import load_experiment
 from sklearn.model_selection import train_test_split
-from screening.tools import scoring_classif
 import os
 import random
 import numpy as np
@@ -25,7 +24,7 @@ def experiment_acc(dataset, loss, penalty, lmbda):
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
         estimator = fit_estimator(X_train, y_train, loss=loss, penalty=penalty, mu=1, lmbda=lmbda, 
                                     intercept=False, max_iter=10000)
-        score += scoring_classif(estimator, X_test, y_test)
+        score += estimator.score(X_test, y_test)
     acc['{}_{}_{}_{}'.format(dataset, loss, penalty, lmbda)] = score / 3
     print('{}_{}_{}_{}'.format(dataset, loss, penalty, lmbda), ' : Done !')
 

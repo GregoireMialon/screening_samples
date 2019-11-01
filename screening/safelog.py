@@ -1,6 +1,5 @@
 from scipy.optimize import fmin_l_bfgs_b
 import numpy as np
-from screening.tools import scoring_classif
 from sklearn.model_selection import train_test_split
 from screening.loaders import load_experiment
 from screening.screentools import (

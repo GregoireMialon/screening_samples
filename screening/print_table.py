@@ -4,12 +4,12 @@ import re
 from screening.settings import RESULTS_PATH
 
 def get_lmbda(filename):
-    lmbda = re.findall('(?<=l2_).*?(?=.npy)', filename)[0]
+    lmbda = re.findall('(?<=l2_).*?(?=.npy)', filename)
     if lmbda is None:
-        lmbda = re.findall('(?<=l1_).*?(?=.npy)', filename)[0]
+        lmbda = re.findall('(?<=l1_).*?(?=.npy)', filename)
     if lmbda is None:
         'LMBDA not found'
-    return lmbda
+    return lmbda[0]
 
 def get_best_score(model, dataset):
     lmbda = 0

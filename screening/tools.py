@@ -130,32 +130,6 @@ def balanced_subsample(x,y,subsample_size=1):
     return xs,ys
 
 
-def find_best_lasso(X, y):
-    param_grid = {'alpha':[0.001,0.01,0.1,1,10], 'fit_intercept':[True, False] }
-    clf = GridSearchCV(estimator = Lasso(max_iter=10000), param_grid = param_grid)
-    clf.fit(X,y)
-    best_lasso = clf.best_estimator_
-    return best_lasso, clf.best_score_
-
-
-def find_best_svm(X, y, no_intercept=False, solver='sklearn_svm'):
-    fit_intercept = [True, False]
-    if no_intercept:
-        fit_intercept = [False]
-    if solver=='sklearn_svm':
-        param_grid = {'C':[0.01, 0.1, 1, 10, 100], 'fit_intercept':fit_intercept}
-        estimator = LinearSVC(loss='hinge', max_iter=10000)
-    elif solver=='sklearn_sgdclassifier':
-        param_grid = {'alpha':[0.01, 0.1, 1, 10, 100], 'fit_intercept':fit_intercept}
-        estimator = SGDClassifier(l1_ratio=0, max_iter=10000)
-    else:
-        print('ERROR, must choose between svm and sgdclassifier')
-    clf = GridSearchCV(estimator = estimator, param_grid = param_grid)
-    clf.fit(X,y)
-    best_svm = clf.best_estimator_
-    return best_svm, clf.best_score_
-
-
 def compute_ellipsoid_volume(radius):
     dim = len(radius)
     num = 2 * (np.pi ** (dim / 2)) * np.prod(radius)
@@ -166,11 +140,6 @@ def compute_ellipsoid_volume(radius):
 def random_screening(X, y, nb_points_to_keep):
     idx_to_keep = sample(range(0, X.shape[0]), nb_points_to_keep)
     return X[idx_to_keep], y[idx_to_keep]
-
-
-def k_medioids(X, y, nb_points_to_keep):
-    print('TODO')
-    return
 
 
 def dataset_has_both_labels(y):

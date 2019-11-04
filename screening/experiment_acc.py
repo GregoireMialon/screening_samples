@@ -16,6 +16,8 @@ def experiment_acc(dataset, loss, penalty, lmbda):
         size=60000
     elif dataset == 'svhn':
         size=604388
+    elif dataset == 'rcv1':
+        size=781265
     X, y = load_experiment(dataset=dataset, synth_params=None, size=size, redundant=0, noise=0, classification=True)
     score = 0
     k = 0
@@ -38,7 +40,7 @@ def experiment_acc(dataset, loss, penalty, lmbda):
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset', default='mnist', choices=['mnist', 'svhn'])
+    parser.add_argument('--dataset', default='mnist', choices=['mnist', 'svhn', 'rcv1'])
     parser.add_argument('--loss', default='squared_hinge',  choices=['hinge', 'squared_hinge', 'squared','truncated_squared', 'safe_logistic', 'logistic'])
     parser.add_argument('--penalty', default='l2', choices=['l1', 'l2'])
     parser.add_argument('--lmbda', default=0.1, type=float)

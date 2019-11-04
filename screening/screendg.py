@@ -61,19 +61,26 @@ class DualityGapScreener:
                 restart = True
             else:
                 restart = False
-            svc.fit(X_train, y_train, lambd=self.lmbda / X_train.shape[0], solver='acc-svrg', 
-                        nepochs=self.n_epochs, tol=1.0e-20, restart=restart, verbose=True)
-            self.z = svc.w
+            info = svc.fit(X_train, y_train, lambd=self.lmbda / (2 * X_train.shape[0]), solver='acc-svrg', 
+                        nepochs=self.n_epochs, it0=1, tol=1.0e-20, restart=restart, verbose=False)
+            self.loss = info[1,-1]
+            dual_loss = info[2, -1]
+            self.dg = self.loss - dual_loss
+            self.z = svc.w.reshape(-1,)
         else:
             svc = LinearSVC(loss='squared_hinge', dual=False, C=1/self.lmbda, fit_intercept=False, 
                             max_iter=self.n_epochs, tol=1.0e-20).fit(self.X_train, self.y_train)
             self.z = svc.coef_
-        self.loss, self.dg = self.get_duality_gap(svc)
+            self.loss, self.dg = self.get_duality_gap(svc)
         self.squared_radius = 2 * self.dg / self.lmbda
         end = time.time()
         print('Time to fit DualityGapScreener :', end - start)
         return self
-
+    
+    def score(self, X, y):
+        outputs = np.sign(X.dot(self.z)) * y
+        outputs_ = [1 if output > 0 else 0 for output in outputs]
+        return np.sum(outputs_) / X.shape[0]
 
     def screen(self, X, y):
         # tol must be small enough so that max_iter is attained
@@ -84,7 +91,6 @@ class DualityGapScreener:
 
 if __name__ == "__main__":
     #we check that it works with MNIST
-    from screening.tools import scoring_classif
     from sklearn.model_selection import train_test_split
     from screening.loaders import load_experiment
     import random
@@ -100,12 +106,17 @@ if __name__ == "__main__":
     prop = np.unique(y_test, return_counts=True)[1]
     print('BASELINE : ', 1 - prop[1] / prop[0])
 
-    for epoch in [1, 3, 10, 30]:
-        print('EPOCH : ', epoch)
-        screener = DualityGapScreener(lmbda=1.0, n_epochs=epoch, ars=True).fit(X_train, y_train)
-        print('DUALITY GAP LAMBDA 1.0 : ', screener.dg)
-    #print(screener.screen(X_train, y_train))
-    #screener = DualityGapScreener(lmbda=0.9, n_epochs=1).fit(X_train, y_train, init=screener.z)
-    #print('DUALITY GAP LAMBDA 0.9 : ', screener.dg)
-    #screener = DualityGapScreener(lmbda=0.8, n_epochs=1).fit(X_train, y_train, init=screener.z)
-    #print('DUALITY GAP LAMBDA 0.8 : ', screener.dg)
+    epoch=20
+    
+    screener = DualityGapScreener(lmbda=0.001, n_epochs=epoch, ars=True).fit(X_train, y_train)
+    print('DUALITY GAP LAMBDA 1.0 ; ', screener.dg)
+    print('SCORE', screener.score(X_test, y_test))
+    print('COEF', screener.z)
+    screener = DualityGapScreener(lmbda=0.0009, n_epochs=1, ars=True).fit(X_train, y_train, init=screener.z)
+    print('DUALITY GAP LAMBDA 0.9 : ', screener.dg)
+    print('SCORE', screener.score(X_test, y_test))
+    print('COEF', screener.z)
+    screener = DualityGapScreener(lmbda=0.0008, n_epochs=1, ars=True).fit(X_train, y_train, init=screener.z)
+    print('DUALITY GAP LAMBDA 0.8 : ', screener.dg)
+    print('SCORE', screener.score(X_test, y_test))
+    print('COEF', screener.z)

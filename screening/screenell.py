@@ -9,9 +9,6 @@ from screening.screentools import (
 from screening.fit import (
     fit_estimator
 )
-from screening.tools import (
-    scoring_screener
-)
 import time 
 import random
 from scipy.sparse import (
@@ -263,6 +260,14 @@ class EllipsoidScreener:
 
         return self
 
+    def score(self, X, y):
+        if self.classification:
+            outputs = np.sign(X.dot(self.z)) * y
+            outputs_ = [1 if output > 0 else 0 for output in outputs]
+            return np.sum(outputs_) / X.shape[0]
+        else:
+            pass
+
     def screen(self, X, y):
         if self.clip_ell or not(self.acceleration) or self.n_steps == 0:
             self.scores = rank_dataset(X, y, self.z, self.A, self.g,
@@ -277,11 +282,10 @@ class EllipsoidScreener:
 
 if __name__ == "__main__":
     #we check that it works with MNIST
-    from screening.tools import scoring_classif
     from sklearn.model_selection import train_test_split
     from screening.loaders import load_experiment
     
-    X, y = load_experiment(dataset='svhn', synth_params=None, size=1000, redundant=0, 
+    X, y = load_experiment(dataset='rcv1', synth_params=None, size=1000, redundant=0, 
                             noise=None, classification=True)
     
     random.seed(0)
@@ -292,11 +296,10 @@ if __name__ == "__main__":
     #print(z_init)
     #rad = 10
     screener = EllipsoidScreener(lmbda=0.01, mu=1, loss='squared_hinge', penalty='l2', 
-                                intercept=False, classification=True, n_ellipsoid_steps=1000, 
+                                intercept=False, classification=True, n_ellipsoid_steps=10, 
                                 better_init=0, better_radius=0, cut=False, clip_ell=False, 
-                                sgd=False, acceleration=True, dc=False, use_sphere=True).fit(X_train, y_train)
+                                sgd=False, acceleration=True, dc=False, use_sphere=False).fit(X_train, y_train)
     prop = np.unique(y_test, return_counts=True)[1]
     print('BASELINE : ', 1 - prop[1] / prop[0])
-    print(scoring_screener(screener, X_test, y_test))
-    print(screener.screen(X_train, y_train))
-    #print('N_EPOCHS :', screener.n_steps, '\nSCORES :', scores[:10]), '\nCENTER :', screener.z[:20]) #, '\nELLIPSOID :', screener.A)
+    print(screener.score(X_test, y_test))
+    #print(screener.screen(X_train, y_train))

@@ -43,7 +43,7 @@ def experiment(dataset, synth_params, size, scale_data, redundant, noise, nb_del
     scores_ell_all = []
     scores_dg_all = []
     scores_r_all = []
-    safe_guarantee = None
+    safe_guarantee = np.array([0, 0])
     
     compt_exp = 0
     nb_safe_ell_all = 0
@@ -114,9 +114,12 @@ def experiment(dataset, synth_params, size, scale_data, redundant, noise, nb_del
 
         if guarantee:
             idx_safeell = np.where(scores_screenell < -mu)[0]
-            safe_guarantee = (fit_estimator(X_train, y_train, loss, penalty, mu, lmbda, intercept), 
-                              fit_estimator(X_train[idx_safeell], y_train[idx_safeell], loss, 
-                              penalty, mu, lmbda, intercept))
+            if len(idx_safeell) !=0:
+                estimator_whole = fit_estimator(X_train, y_train, loss, penalty, mu, lmbda, intercept)
+                estimator_screened = fit_estimator(X_train[idx_safeell], y_train[idx_safeell], loss, 
+                                penalty, mu, lmbda, intercept)
+                safe_guarantee = np.array([estimator_whole.score(X_train, y_train),
+                                            estimator_screened.score(X_train, y_train)])
 
         if nb_delete_steps != 0:
             nb_to_del_table = np.sqrt(np.linspace(1, X_train.shape[0], nb_delete_steps, dtype='int'))

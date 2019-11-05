@@ -77,7 +77,7 @@ def compute_loss(z, X, y, loss, penalty, lmbda, mu):
     return loss + lmbda * reg
 
 
-def compute_subgradient(x, D, y, lmbda, mu, loss, penalty, intercept):
+def compute_subgradient(x, D, y, lmbda, mu, loss, penalty, intercept, ars):
     if loss == 'truncated_squared':
         output = D.dot(x) - y
         g_1 = compute_truncated_squared_loss_gradient(output, mu)
@@ -93,6 +93,8 @@ def compute_subgradient(x, D, y, lmbda, mu, loss, penalty, intercept):
         output = y * (D.dot(x))
         g_1 = compute_squared_hinge_gradient(output, mu)
         g_1 = (np.transpose(D).dot(y * g_1))
+        if ars:
+            g_1 /= (2 * D.shape[0]) 
     elif loss == 'safe_logistic':
         output = y * (D.dot(x))
         g_1 = compute_safe_logistic_gradient(output, mu)

@@ -1,5 +1,4 @@
 from sklearn.svm import LinearSVC
-from sklearn.linear_model import SGDClassifier
 from screening.screentools import (
     rank_dataset,
     rank_dataset_accelerated,
@@ -70,7 +69,7 @@ class DualityGapScreener:
         else:
             svc = LinearSVC(loss='squared_hinge', dual=False, C=1/self.lmbda, fit_intercept=False, 
                             max_iter=self.n_epochs, tol=1.0e-20).fit(self.X_train, self.y_train)
-            self.z = svc.coef_
+            self.z = svc.coef_.reshape(-1,)
             self.loss, self.dg = self.get_duality_gap(svc)
         self.squared_radius = 2 * self.dg / self.lmbda
         end = time.time()

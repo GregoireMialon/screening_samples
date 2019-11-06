@@ -23,7 +23,7 @@ from scipy.sparse.linalg import (
 class EllipsoidScreener:
 
     def __init__(self, lmbda, mu, loss, penalty, intercept, classification, n_ellipsoid_steps, 
-                    better_init, better_radius, cut, clip_ell, sgd=False, acceleration=True, dc=False,
+                    better_init=0, better_radius=0, cut=False, clip_ell=False, sgd=False, acceleration=True, dc=False,
                     use_sphere=False, ars=False):
 
         self.lmbda = lmbda

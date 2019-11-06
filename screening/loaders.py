@@ -45,7 +45,7 @@ def load_mnist(pb=1):
         else:
             y[i] = 1
     print(' ... Done !')
-    return X, y
+    return X.astype('float64'), y
 
 def load_svhn():
     print('Loading SVHN features ...')

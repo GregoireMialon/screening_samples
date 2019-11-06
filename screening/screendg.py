@@ -31,16 +31,21 @@ class DualityGapScreener:
         Liblinear and Lightning optimize (1/2) * ||x|| ^2 + C * loss(Ax).
         The loss is not normalized by the number of samples.
         '''
-        coef = svc.coef_.reshape(-1,)
-        pred = self.X_train.dot(coef) * self.y_train
-        primal_loss = compute_squared_hinge(u=pred, mu=1)
-        primal_reg = (self.lmbda / 2) * (np.linalg.norm(coef) ** 2)
-        dual_coef = compute_squared_hinge_gradient(u=pred, mu=1)
-        dual_pred = self.X_train.T.dot(self.y_train * dual_coef)
-        dual_loss = compute_squared_hinge_conjugate(dual_coef)
-        dual_reg = (1 / (2 * self.lmbda)) * (np.linalg.norm(dual_pred) ** 2)
-        loss = primal_loss + primal_reg
-        dg = loss + dual_loss + dual_reg
+        if self.ars:
+            info = svc.eval(self.X_train, self.y_train, self.lmbda)
+            loss = info[1,-1]
+            dg = loss - info[2, -1]
+        else:
+            coef = svc.coef_.reshape(-1,)
+            pred = self.X_train.dot(coef) * self.y_train
+            primal_loss = compute_squared_hinge(u=pred, mu=1)
+            primal_reg = (self.lmbda / 2) * (np.linalg.norm(coef) ** 2)
+            dual_coef = compute_squared_hinge_gradient(u=pred, mu=1)
+            dual_pred = self.X_train.T.dot(self.y_train * dual_coef)
+            dual_loss = compute_squared_hinge_conjugate(dual_coef)
+            dual_reg = (1 / (2 * self.lmbda)) * (np.linalg.norm(dual_pred) ** 2)
+            loss = primal_loss + primal_reg
+            dg = loss + dual_loss + dual_reg
         return loss, dg
     
 
@@ -48,25 +53,24 @@ class DualityGapScreener:
         start = time.time()
         self.X_train = X_train
         self.y_train = y_train
-        first_svc = LinearSVC(loss='squared_hinge', dual=False, C=1/self.lmbda, fit_intercept=False, 
-                            max_iter=0, tol=1.0e-20).fit(self.X_train, self.y_train)
-        if init is not None:
-            first_svc.coef_ = init
-        self.first_obj, self.first_dg = self.get_duality_gap(first_svc)
+    
         if self.ars:
             svc = BinaryClassifier(loss='sqhinge', penalty='l2', intercept=False)
             if init is not None:
-                svc.w = init
+                svc.w = init #update if possible
                 restart = True
             else:
                 restart = False
+            self.first_obj, self.first_dg =  self.get_duality_gap(svc)
             info = svc.fit(X_train, y_train, lambd=self.lmbda / (2 * X_train.shape[0]), solver='acc-svrg', 
                         nepochs=self.n_epochs, it0=1, tol=1.0e-20, restart=restart, verbose=False)
             self.loss = info[1,-1]
-            dual_loss = info[2, -1]
-            self.dg = self.loss - dual_loss
+            self.dg = self.loss - info[2, -1]
             self.z = svc.w.reshape(-1,)
         else:
+            first_svc = LinearSVC(loss='squared_hinge', dual=False, C=1/self.lmbda, fit_intercept=False, 
+                            max_iter=0, tol=1.0e-20).fit(self.X_train, self.y_train)
+            self.first_obj, self.first_dg = self.get_duality_gap(first_svc)
             svc = LinearSVC(loss='squared_hinge', dual=False, C=1/self.lmbda, fit_intercept=False, 
                             max_iter=self.n_epochs, tol=1.0e-20).fit(self.X_train, self.y_train)
             self.z = svc.coef_.reshape(-1,)

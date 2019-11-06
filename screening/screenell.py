@@ -244,7 +244,6 @@ class EllipsoidScreener:
                 self.A = eigenvect.dot(np.multiply(eigenvals, np.transpose(eigenvect)))
             
             if self.acceleration and self.use_sphere:
-                #import pdb; pdb.set_trace()
                 self.I_k_vec = self.I_k_vec.reshape(-1,1)
                 if type(X_train).__name__ != 'csr_matrix':
                     A = self.scaling * np.identity(X_train.shape[1]) - self.L.dot(np.multiply(self.I_k_vec, np.transpose(self.L)))

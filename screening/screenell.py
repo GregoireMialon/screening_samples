@@ -25,7 +25,6 @@ class EllipsoidScreener:
     def __init__(self, lmbda, mu, loss, penalty, intercept, classification, n_ellipsoid_steps, 
                     better_init=0, better_radius=0, cut=False, clip_ell=False, sgd=False, acceleration=True, dc=False,
                     use_sphere=False, ars=False):
-
         self.lmbda = lmbda
         self.mu = mu
         self.loss = loss
@@ -199,9 +198,12 @@ class EllipsoidScreener:
             r_init = X.shape[1]
 
         if self.better_init is not 0:
-            est = fit_estimator(X, y, self.loss, self.penalty, self.mu, self.lmbda, self.intercept, max_iter=self.better_init)
+            est = fit_estimator(X, y, self.loss, self.penalty, self.mu, self.lmbda, self.intercept, max_iter=self.better_init, ars=self.ars)
             if self.classification:
-                z_init = est.coef_[0]
+                if self.ars:
+                    z_init = est.w
+                else:
+                    z_init = est.coef_[0]
                 if self.intercept:
                     z_init = np.append(z_init, est.intercept_)
             else:

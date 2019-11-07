@@ -54,14 +54,14 @@ def load_svhn():
     y = mat['Ytr'].reshape(-1,)
     y = np.array([1 if label == 1 else -1 for label in y])
     print(' ... Done !')
-    return X, y
+    return X.astype('float64'), y
 
 def load_rcv1():
     print('Loading RCV1 features ...')
     X = load_npz(os.path.join(DATASETS_PATH, 'rcv1_X.npz'))
     y = np.load(os.path.join(DATASETS_PATH, 'rcv1_y.npy'))
     print(' ... Done !')
-    return X, y
+    return X.astype('float64'), y
 
 def load_higgs():
     dir_higgs = DATASETS_PATH + 'higgs'

@@ -57,12 +57,12 @@ class DualityGapScreener:
         if self.ars:
             svc = BinaryClassifier(loss='sqhinge', penalty='l2', intercept=False)
             if init is not None:
-                svc.w = init #update if possible
+                svc.w = init
                 restart = True
             else:
                 restart = False
             self.first_obj, self.first_dg =  self.get_duality_gap(svc)
-            info = svc.fit(X_train, y_train, lambd=self.lmbda / (2 * X_train.shape[0]), solver='acc-svrg', 
+            info = svc.fit(X_train, y_train, lambd=self.lmbda, solver='acc-svrg', 
                         nepochs=self.n_epochs, it0=1, tol=1.0e-20, restart=restart, verbose=False)
             self.loss = info[1,-1]
             self.dg = self.loss - info[2, -1]
@@ -87,7 +87,7 @@ class DualityGapScreener:
 
     def screen(self, X, y):
         # tol must be small enough so that max_iter is attained
-        return rank_dataset_accelerated(D=X, y=y, z=self.z.reshape(-1,), scaling=self.squared_radius, 
+        return rank_dataset_accelerated(D=X, y=y, z=self.z, scaling=self.squared_radius, 
                                         L=0, I_k_vec=0, g=None, mu=1, classification=True, intercept=False, 
                                         cut=False)
     

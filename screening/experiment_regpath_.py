@@ -29,13 +29,13 @@ import time
 
 #@profile
 def experiment_regpath_(dataset, synth_params, size, scale_data, redundant, noise, lmbda_grid, mu, classification, 
-                loss, penalty, intercept, n_ellipsoid_steps, n_epochs, n_epochs_ell_path, n_epochs_dg_path, cut, get_ell_from_subset, clip_ell, use_sphere, 
+                loss, penalty, intercept, n_ellipsoid_steps, n_epochs, n_epochs_ell_path, cut, get_ell_from_subset, clip_ell, use_sphere, 
                 nb_exp, nb_test, dontsave):
     
     print('START')
 
-    exp_title = 'X_size_{}_ell_subset_{}_loss_{}_lmbda_grid_{}_intercept_{}_n_ell_{}_mu_{}_redundant_{}_noise_{}_cut_ell_{}_clip_ell_{}_n_epochs_{}_n_ell_path_{}_n_dg_path_{}_use_sphere_{}_regpath_'.format(size, 
-        get_ell_from_subset, loss, lmbda_grid, intercept, n_ellipsoid_steps, mu, redundant, noise, cut, clip_ell, n_epochs, n_epochs_ell_path, n_epochs_dg_path, use_sphere)
+    exp_title = 'X_size_{}_ell_subset_{}_loss_{}_lmbda_grid_{}_intercept_{}_n_ell_{}_mu_{}_redundant_{}_noise_{}_cut_ell_{}_clip_ell_{}_n_epochs_{}_n_ell_path_{}_use_sphere_{}_regpath_'.format(size, 
+        get_ell_from_subset, loss, lmbda_grid, intercept, n_ellipsoid_steps, mu, redundant, noise, cut, clip_ell, n_epochs, n_epochs_ell_path, use_sphere)
     print(exp_title)
 
     X, y = load_experiment(dataset, synth_params, size, redundant, noise, classification)
@@ -75,11 +75,13 @@ def experiment_regpath_(dataset, synth_params, size, scale_data, redundant, nois
                 start = time.time()
                 svc = BinaryClassifier(loss='sqhinge', penalty=penalty, intercept=intercept)
                 svc.fit(X_train, y_train, solver='acc-svrg', lambd=lmbda, verbose=False)
-                z_svc = svc.w
                 stop = time.time()
                 time_noscreen = stop - start
+                svc_ell = svc
+                z_svc_ell = svc_ell.w
 
-                z_svc_ell = svc.w
+                print('Z_DG', screener_dg.z, 'Z_ELL', screener_ell.z)
+                print('SCORE DG', screener_dg.score(X_train, y_train), 'SCORE ELL', screener_ell.score(X_train, y_train))
 
             else:
                 start = time.time()
@@ -89,23 +91,28 @@ def experiment_regpath_(dataset, synth_params, size, scale_data, redundant, nois
                                                 cut=cut, clip_ell=clip_ell, use_sphere=use_sphere, 
                                                 ars=True)
                 screener_dg = DualityGapScreener(lmbda=lmbda, n_epochs=n_epochs_ell_path, ars=True)
-                screener_dg.fit(X_train, y_train, init=z_svc)
+                screener_dg.fit(X_train, y_train, init=z_svc_ell)
 
                 random_subset = random.sample(range(0, X_train.shape[0]), get_ell_from_subset)
                 screener_ell.fit(X_train[random_subset], y_train[random_subset], 
-                                init=z_svc_ell, rad=2 * screener_dg.dg / lmbda)
-                scores_ell = screener_ell.score(X_train, y_train)
+                                init=screener_dg.z, rad=2 * screener_dg.dg / lmbda)
+                print('INIT RAD : ', 2 * screener_dg.dg / lmbda)
+                #print('FINAL RAD : ', screener_ell.squared_radius)
+                print('Z_DG', screener_dg.z, 'Z_ELL', screener_ell.z)
+                print('SCORE DG', screener_dg.score(X_train, y_train), 'SCORE ELL', screener_ell.score(X_train, y_train))
+                scores_ell = screener_ell.screen(X_train, y_train)
+                print('SCORES : ', scores_ell)
                 tokeep_ell = np.where(scores_ell > - mu)[0]
                 svc_ell = BinaryClassifier(loss='sqhinge', penalty=penalty, intercept=intercept)
+                print('CURRENT SHAPE : ', len(tokeep_ell))
                 svc_ell.fit(X_train[tokeep_ell], y_train[tokeep_ell], solver='acc-svrg', lambd=lmbda, verbose=False)
                 z_svc_ell = svc_ell.w
                 stop = time.time()
-                time_noscreen = stop - start
+                time_ell = stop - start
 
                 start = time.time()
                 svc = BinaryClassifier(loss='sqhinge', penalty=penalty, intercept=intercept)
                 svc.fit(X_train, y_train, solver='acc-svrg', lambd=lmbda, verbose=False)
-                z_svc = svc.w
                 stop = time.time()
                 time_noscreen = stop - start
 
@@ -138,16 +145,15 @@ if __name__ == '__main__':
     parser.add_argument('--scale_data', action='store_true')
     parser.add_argument('--redundant', default=0, type=int, help='add redundant examples to the dataset. Do not use redundant with --size')
     parser.add_argument('--noise', default=0.1, type=float, help='standard deviation of the noise to add to the redundant examples')
-    parser.add_argument('--lmbda_grid', default=[1, 0.8, 0.5, 0.3, 0.1], nargs='+', type=float, help='regularization parameter grid of the estimator')
+    parser.add_argument('--lmbda_grid', default=[1, 0.9, 0.8, 0.7], nargs='+', type=float, help='regularization parameter grid of the estimator')
     parser.add_argument('--mu', default=1.0, type=float, help='regularization parameter of the dual')
     parser.add_argument('--classification', action='store_true')
     parser.add_argument('--loss', default='squared_hinge', choices=['hinge', 'squared_hinge', 'squared','truncated_squared', 'safe_logistic', 'logistic'])
     parser.add_argument('--penalty', default='l2', choices=['l1','l2'])
     parser.add_argument('--intercept', action='store_true')
-    parser.add_argument('--n_ellipsoid_steps', default=10, type=int, help='number of ellipsoid step in screen ell')
+    parser.add_argument('--n_ellipsoid_steps', default=100, type=int, help='number of ellipsoid step in screen ell')
     parser.add_argument('--n_epochs', default=3, type=int, help='number of epochs of the solver in ellipsoid method for screening')
-    parser.add_argument('--n_epochs_ell_path', default=3, type=int, help='number of epochs of the solver in ellipsoid method for screening in path')
-    parser.add_argument('--n_epochs_dg_path', default=5, type=int, help='number of epochs of the solver in the duality gap baseline for screening in path')
+    parser.add_argument('--n_epochs_ell_path', default=30, type=int, help='number of epochs of the solver in ellipsoid method for screening in path')
     parser.add_argument('--cut_ell', action='store_true', help='cut the final ellipsoid in half using a subgradient of the loss')
     parser.add_argument('--get_ell_from_subset', default=0, type=int, help='train the ellipsoid on a random subset of the dataset')
     parser.add_argument('--clip_ell', action='store_true', help='clip the eigenvalues of the ellipsoid')
@@ -161,5 +167,5 @@ if __name__ == '__main__':
     experiment_regpath_(args.dataset, args.synth_params, args.size, args.scale_data, args.redundant, args.noise, 
                 args.lmbda_grid, args.mu, args.classification, args.loss, args.penalty, 
                 args.intercept, args.n_ellipsoid_steps, args.n_epochs, args.n_epochs_ell_path, 
-                args.n_epochs_dg_path, args.cut_ell, args.get_ell_from_subset, args.clip_ell, args.use_sphere, 
+                args.cut_ell, args.get_ell_from_subset, args.clip_ell, args.use_sphere, 
                 args.nb_exp, args.nb_test, args.dontsave)

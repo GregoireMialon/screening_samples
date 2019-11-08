@@ -138,7 +138,8 @@ def experiment(dataset, synth_params, size, scale_data, redundant, noise, nb_del
                 
                 X_screenell, y_screenell = X_train[idx_screenell[nb_to_delete:]], y_train[idx_screenell[nb_to_delete:]]
                 X_screendg, y_screendg = X_train[idx_screendg[nb_to_delete:]], y_train[idx_screendg[nb_to_delete:]]
-                X_r, y_r = random_screening(X_r, y_r, X_train.shape[0] - nb_to_delete)
+                #X_r, y_r = random_screening(X_r, y_r, X_train.shape[0] - nb_to_delete)
+                X_r, y_r = X_train[nb_to_delete:], y_train[nb_to_delete:]
                 if not(dataset_has_both_labels(y_r)):
                     print('Warning, only one label in randomly screened dataset')
                 if not(dataset_has_both_labels(y_screenell)):

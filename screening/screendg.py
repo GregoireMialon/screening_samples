@@ -61,7 +61,7 @@ class DualityGapScreener:
                 restart = True
             else:
                 restart = False
-            self.first_obj, self.first_dg =  self.get_duality_gap(svc)
+            #self.first_obj, self.first_dg =  self.get_duality_gap(svc)
             info = svc.fit(X_train, y_train, lambd=self.lmbda, solver='acc-svrg', 
                         nepochs=self.n_epochs, it0=1, tol=1.0e-20, restart=restart, verbose=False)
             self.loss = info[1,-1]

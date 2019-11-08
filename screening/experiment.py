@@ -27,17 +27,21 @@ import os
 
 #@profile
 def experiment(dataset, synth_params, size, scale_data, redundant, noise, nb_delete_steps, lmbda, mu, classification, 
-                loss, penalty, intercept, n_ellipsoid_steps, better_init, better_radius, cut, get_ell_from_subset, clip_ell, 
+                loss, penalty, intercept, better_init, better_radius, cut, get_ell_from_subset, clip_ell, 
                 use_sphere, guarantee, n_epochs_dg, nb_exp, nb_test, plot, zoom, dontsave):
     
     print('START')
 
+    X, y = load_experiment(dataset, synth_params, size, redundant, noise, classification)
+
+    if get_ell_from_subset != 0:
+        n_ellipsoid_steps_ = int((n_epochs_dg - better_init) * X.shape[0] * 0.8 / get_ell_from_subset)
+    else:
+        n_ellipsoid_steps_ = int((n_epochs_dg - better_init))
     exp_title = 'X_size_{}_ell_subset_{}_loss_{}_lmbda_{}_n_ellipsoid_{}_intercept_{}_mu_{}_redundant_{}_noise_{}_better_init_{}_better_radius_{}_cut_ell_{}_clip_ell_{}_n_dg_{}_use_sphere_{}_nds_{}'.format(size, 
-        get_ell_from_subset, loss, lmbda, n_ellipsoid_steps, intercept, mu, redundant, noise, better_init, 
+        get_ell_from_subset, loss, lmbda, n_ellipsoid_steps_, intercept, mu, redundant, noise, better_init, 
         better_radius, cut, clip_ell, n_epochs_dg, use_sphere, nb_delete_steps)
     print(exp_title)
-
-    X, y = load_experiment(dataset, synth_params, size, redundant, noise, classification)
 
     scores_regular_all = []
     scores_ell_all = []
@@ -48,15 +52,16 @@ def experiment(dataset, synth_params, size, scale_data, redundant, noise, nb_del
     compt_exp = 0
     nb_safe_ell_all = 0
     nb_safe_dg_all = 0
-    
+
     while compt_exp < nb_exp:
         random.seed(compt_exp + 1)
         np.random.seed(compt_exp + 1)
         compt_exp += 1
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+        print('Ellipsoid steps to be done : ', n_ellipsoid_steps_)
         screener_ell = EllipsoidScreener(lmbda=lmbda, mu=mu, loss=loss, penalty=penalty, 
                                             intercept=intercept, classification=classification, 
-                                            n_ellipsoid_steps=n_ellipsoid_steps, 
+                                            n_ellipsoid_steps=n_ellipsoid_steps_, 
                                             better_init=0, better_radius=0, 
                                             cut=cut, clip_ell=clip_ell, use_sphere=use_sphere)
         screener_dg = DualityGapScreener(lmbda=lmbda, n_epochs=better_init)
@@ -217,7 +222,6 @@ if __name__ == '__main__':
     parser.add_argument('--loss', default='squared_hinge', choices=['hinge', 'squared_hinge', 'squared','truncated_squared', 'safe_logistic', 'logistic'])
     parser.add_argument('--penalty', default='l2', choices=['l1','l2'])
     parser.add_argument('--intercept', action='store_true')
-    parser.add_argument('--n_ellipsoid_steps', default=10, type=int, help='number of iterations of the ellipsoid method')
     parser.add_argument('--better_init', default=0, type=int, help='number of optimizer gradient steps to initialize the center of the ellipsoid')
     parser.add_argument('--better_radius', default=0, type=float, help='DEPRECATED, radius of the initial l2 ball')
     parser.add_argument('--cut_ell', action='store_true', help='cut the final ellipsoid in half using a subgradient of the loss')
@@ -226,8 +230,8 @@ if __name__ == '__main__':
     parser.add_argument('--use_sphere', action='store_true', help='the region is a sphere whose radius is the smallest semi-axe of the ellipsoid')
     parser.add_argument('--guarantee', action='store_true', help='check whether the deleted points were safe')
     parser.add_argument('--n_epochs_dg', default=5, type=int, help='number of epochs of the solver in the duality gap baseline for screening')
-    parser.add_argument('--nb_exp', default=3, type=int)
-    parser.add_argument('--nb_test', default=3, type=int)
+    parser.add_argument('--nb_exp', default=2, type=int)
+    parser.add_argument('--nb_test', default=2, type=int)
     parser.add_argument('--plot', action='store_true')
     parser.add_argument('--zoom', default=[0, 1], nargs='+', type=float, help='zoom in the final plot')
     parser.add_argument('--dontsave', action='store_true', help='do not save your experiment, but no plot possible')
@@ -236,6 +240,6 @@ if __name__ == '__main__':
 
     experiment(args.dataset, args.synth_params, args.size, args.scale_data, args.redundant, args.noise, 
                 args.nb_delete_steps, args.lmbda, args.mu, args.classification, args.loss, args.penalty, 
-                args.intercept, args.n_ellipsoid_steps, args.better_init, args.better_radius, args.cut_ell, 
+                args.intercept, args.better_init, args.better_radius, args.cut_ell, 
                 args.get_ell_from_subset, args.clip_ell, args.use_sphere, args.guarantee, args.n_epochs_dg, 
                 args.nb_exp, args.nb_test, args.plot, args.zoom, args.dontsave)

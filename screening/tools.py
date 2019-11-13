@@ -137,11 +137,6 @@ def compute_ellipsoid_volume(radius):
     return num / den
 
 
-def random_screening(X, y, nb_points_to_keep):
-    idx_to_keep = sample(range(0, X.shape[0]), nb_points_to_keep)
-    return X[idx_to_keep], y[idx_to_keep]
-
-
 def dataset_has_both_labels(y):
     has_both_labels=True
     nb_labels = len(np.unique(y))

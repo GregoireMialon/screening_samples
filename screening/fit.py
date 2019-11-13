@@ -18,8 +18,8 @@ def fit_estimator(X, y, loss, penalty, mu, lmbda, intercept, max_iter=10000, ars
         estimator = LinearSVC(C= 1 / lmbda, loss=loss, dual=False, penalty=penalty, fit_intercept=intercept, 
                         max_iter=1000).fit(X, y) 
     elif loss == 'squared_hinge' and ars:
-        estimator = BinaryClassifier(loss='sqhinge', penalty=penalty, intercept=intercept).fit(X, y, 
-                                        lambd=lmbda, solver='acc-svrg', nepochs=max_iter, verbose=False)            
+        estimator = BinaryClassifier(loss='sqhinge', penalty=penalty, intercept=intercept)
+        estimator.fit(X, y, lambd=lmbda, solver='acc-svrg', nepochs=max_iter, verbose=False)            
     elif loss == 'safe_logistic':
         estimator = SafeLogistic(mu=mu, lmbda=lmbda, penalty=penalty, max_iter=max_iter).fit(X, y)
     elif loss == 'logistic':

@@ -122,71 +122,32 @@ class EllipsoidScreener:
         k = 0
         z = z_init
         p = z_init.size
-        s = p ** 2 / (p ** 2 - 1)
+        s = (p ** 2) / (p ** 2 - 1)
         scaling = r_init * (s ** (self.n_steps))
 
-        if self.sgd:
-            random_subset = np.arange(D.shape[0])
-            a_g_list = []
-            while k < self.n_steps:
-                random.shuffle(random_subset)
-                for i in range(D.shape[0]):
-                    g = compute_subgradient(z, X[random_subset[i]].reshape(1,-1), 
-                                                np.array(y[random_subset[i]]), self.lmbda, 
-                                                self.mu, self.loss, self.penalty, self.intercept, 
-                                                self.ars)
-                    if k == 0 and i == 0:
-                        A_g = r_init * g
-                        den = np.sqrt(g.dot(A_g))
-                        A_g = (1 / den) * A_g 
-                        z = z - (1 / (p + 1)) * A_g
-                        A_g = A_g.reshape(1,-1)
-                        L = A_g.T
-                        #a_g_list.append(A_g.T)
-                        I_k_vec = s * (2 / (p + 1)) * np.ones(1)
-                    else:
-                        temp = np.concatenate([a_g for a_g in a_g_list], axis=1)
-                        A_g = compute_A_g(r_init * (s ** k), temp, I_k_vec, g)
-                        den = np.sqrt(g.dot(A_g))
-                        A_g = (1 / den) * A_g
-                        z = z - (1 / (p + 1)) * A_g
-                        A_g = A_g.reshape(1,-1)
-                        a_g_list.append(A_g.T)
-                        #TODO: list.append() puis concatenate à la fin ?
-                        L = np.concatenate((L, A_g.T), axis=1)
-                        I_k_vec = np.insert(I_k_vec, 0, (s ** (k + 1)) * (2 / (p + 1)))
-                
-                k += 1
-                print(k)
-            L = np.concatenate([a_g for a_g in a_g_list], axis=1)
-        else:
-            while k < self.n_steps:
+        L = np.zeros((self.n_steps, X.shape[1]))
+        while k < self.n_steps:
+            if k % 10 == 0:
                 print('ELL METHOD IT : ', k)
-                g = compute_subgradient(z, X, y, self.lmbda, self.mu, self.loss, self.penalty, 
-                                        self.intercept, self.ars)
-                if k == 0:
-                    A_g = r_init * g
-                    den = np.sqrt(g.dot(A_g))
-                    A_g = (1 / den) * A_g 
-                    z = z - (1 / (p + 1)) * A_g
-                    A_g = A_g.reshape(1,-1)
-                    L = A_g.T
-                    I_k_vec = s * (2 / (p + 1)) * np.ones(1)
-                else:
-                    A_g = compute_A_g(r_init * (s ** k), L, I_k_vec, g)
-                    den = np.sqrt(g.dot(A_g))
-                    A_g = (1 / den) * A_g
-                    z = z - (1 / (p + 1)) * A_g
-                    A_g = A_g.reshape(1,-1)
-                    L = np.concatenate((L, A_g.T), axis=1)
-                    I_k_vec = np.insert(I_k_vec, 0, (s ** (k + 1)) * (2 / (p + 1)))
-                k += 1
-        
+            g = compute_subgradient(z, X, y, self.lmbda, self.mu, self.loss, self.penalty, 
+                                    self.intercept, self.ars)
+            if k == 0:
+                A_g = r_init * g
+                I_k_vec = s * (2 / (p + 1)) * np.ones(1)
+            else:
+                A_g = compute_A_g(r_init * (s ** k), L[:k,:].T, I_k_vec, g)
+                I_k_vec = np.insert(I_k_vec, 0, (s ** (k + 1)) * (2 / (p + 1)))
+            den = np.sqrt(g.dot(A_g))
+            A_g = (1 / den) * A_g 
+            z = z - (1 / (p + 1)) * A_g
+            L[k,:] = A_g
+            k += 1
+
         self.z = z
         self.scaling = scaling
         if type(D).__name__ == 'csr_matrix':
             L = csr_matrix(L)
-        self.L = L
+        self.L = L.T
         self.I_k_vec = I_k_vec
         self.r_init = r_init
     
@@ -223,11 +184,6 @@ class EllipsoidScreener:
         if self.better_radius != 0:
             r_init = float(self.better_radius)
         
-        #only works with iter_ell_accelerated
-        #if type(X).__name__ == 'csr_matrix':
-        #    z_init = csr_matrix(z_init)
-        #    print('z_init is csr', type(z_init))
-
         if self.acceleration:                            
             self.iter_ell_accelerated(X, y, z_init, r_init)
         elif self.dc:
@@ -237,6 +193,7 @@ class EllipsoidScreener:
         
         return
     
+    #@profile
     def fit(self, X_train, y_train, init=None, rad=0):
         start = time.time()
         if self.n_steps == 0:
@@ -254,14 +211,16 @@ class EllipsoidScreener:
                 self.A = eigenvect.dot(np.multiply(eigenvals, np.transpose(eigenvect)))
             
             if self.acceleration and self.use_sphere:
-                self.I_k_vec = self.I_k_vec.reshape(-1,1)
+                self.I_k_vec = self.I_k_vec.reshape(1,-1)
                 if type(X_train).__name__ != 'csr_matrix':
-                    A = self.scaling * np.identity(X_train.shape[1]) - self.L.dot(np.multiply(self.I_k_vec, np.transpose(self.L)))
-                    eigenvals = np.linalg.eigvalsh(A)
+                    U = np.multiply(self.L, np.sqrt(self.I_k_vec))
+                    UTU = U.T.dot(U)
+                    eigenval_max = np.linalg.eigvalsh(UTU)[-1]
                 else:
-                    A = self.scaling * identity(X_train.shape[1]) - self.L.dot(self.L.T.multiply(self.I_k_vec))
-                    eigenvals = eigsh(A, k=1, which='SM', return_eigenvectors=False)
-                self.squared_radius = eigenvals[0]
+                    U = self.L.multiply(self.I_k_vec)
+                    UTU = U.T.dot(U)
+                    eigenval_max = eigsh(UTU, k=1, which='LM', return_eigenvectors=False)
+                self.squared_radius = self.scaling - eigenval_max
                 print('Using minimal sphere of ellipsoid')
 
         if self.cut:
@@ -298,7 +257,7 @@ if __name__ == "__main__":
     from sklearn.model_selection import train_test_split
     from screening.loaders import load_experiment
     
-    X, y = load_experiment(dataset='rcv1', synth_params=None, size=1000, redundant=0, 
+    X, y = load_experiment(dataset='rcv1', synth_params=None, size=60000, redundant=0, 
                             noise=None, classification=True)
     
     random.seed(0)
@@ -306,15 +265,14 @@ if __name__ == "__main__":
 
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
     z_init = np.random.rand(X_train.shape[1])
-    #print(z_init)
-    #rad = 10
-    screener = EllipsoidScreener(lmbda=1, mu=1, loss='squared_hinge', penalty='l2', 
-                                intercept=False, classification=True, n_ellipsoid_steps=10, 
-                                better_init=0, better_radius=0, cut=False, clip_ell=False, 
-                                sgd=False, acceleration=True, dc=False, use_sphere=False,
-                                ars=True).fit(X_train, y_train)
+    screener = EllipsoidScreener(lmbda=1000, mu=1, loss='squared_hinge', penalty='l2', 
+                                intercept=False, classification=True, n_ellipsoid_steps=200, 
+                                better_init=10, better_radius=0, cut=False, clip_ell=False, 
+                                sgd=False, acceleration=True, dc=False, use_sphere=True,
+                                ars=False).fit(X_train, y_train)
     prop = np.unique(y_test, return_counts=True)[1]
     print('BASELINE : ', 1 - prop[1] / prop[0])
-    print(screener.score(X_test, y_test))
-    print(screener.z)
+    #print(screener.score(X_test, y_test))
+    #print(screener.z)
+    print(screener.screen(X_train[:5], y_train[:5]))
 

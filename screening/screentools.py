@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.sparse import rand
+from scipy.sparse import (
+    rand, csr_matrix, csc_matrix
+)
 import random
 import time
 from sklearn.model_selection import train_test_split
@@ -51,11 +53,14 @@ def compute_safe_logistic_gradient(u, mu):
     #we make a change of variable mu = 1 - mu w.r.t the actual formula
     return np.exp(np.minimum(u - mu, 0)) - np.ones(len(u))
 
+
 def compute_logistic(u):
     return np.log(np.exp(-u) + 1)
     
+
 def compute_logistic_gradient(u):
     return - np.exp(-u) / (np.exp(-u) + 1)
+
 
 def compute_loss(z, X, y, loss, penalty, lmbda, mu):
     if loss == 'squared_hinge':
@@ -127,6 +132,16 @@ def compute_A_g(scaling, L, I_k_vec, g):
     return A_g
 
 
+def compute_A_X(scaling, L, I_k_vec, X):
+    if L is not 0 and I_k_vec is not 0:
+        L_X = L.T.dot(X)
+        I_k_L = csr_matrix(L_X.multiply(I_k_vec.reshape(-1,1)))
+        A_X = scaling * csr_matrix(X) - L.dot(I_k_L)
+    else:
+        A_X = scaling * X
+    return A_X
+
+
 def compute_test_accelerated(D_i, y_i, z, scaling, L, I_k_vec, g, classification, cut):
     A_D_i = compute_A_g(scaling, L, I_k_vec, D_i).T
     if classification:
@@ -161,6 +176,15 @@ def compute_test_accelerated(D_i, y_i, z, scaling, L, I_k_vec, g, classification
     return test
 
 
+def compute_test_accelerated_(Xy, z, scaling, L, I_k_vec, g, cut):
+    A_X = compute_A_X(scaling, L, I_k_vec, Xy.T)
+    if cut:
+        pass
+    else:
+        test = Xy.dot(z) - np.sqrt(np.array((A_X.T.multiply(Xy)).sum(1)).reshape(-1,))
+    return test
+
+
 def rank_dataset_accelerated(D, y, z, scaling, L, I_k_vec, g, mu, classification, intercept, cut):
     '''
     Gives score to each sample, does not re-order the dataset
@@ -172,10 +196,13 @@ def rank_dataset_accelerated(D, y, z, scaling, L, I_k_vec, g, mu, classification
     scores = np.zeros(X.shape[0])
     
     if classification:
-        for i in range(X.shape[0]):
-            x_i = y[i] * X[i]
-            scores[i] = - compute_test_accelerated(x_i, y[i], z, scaling, L,
-             I_k_vec, g, classification, cut)
+        if type(D).__name__ == 'csr_matrix':
+            Xy = csr_matrix(X.multiply(y.reshape(-1,1)))
+            scores = - compute_test_accelerated_(Xy, z, scaling, L, I_k_vec, g, cut)
+        else:
+            Xy = y.reshape(-1,1) * X
+            scores = - np.array([compute_test_accelerated(sample, None, z, scaling, L, I_k_vec, 
+                                                    g, classification, cut) for sample in Xy])
     else:
         for i in range(X.shape[0]):
             test_1 = compute_test_accelerated(X[i], y[i], z, scaling, L, I_k_vec, g,

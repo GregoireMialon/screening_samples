@@ -13,6 +13,7 @@ import time
 import random
 from scipy.sparse import (
     csr_matrix,
+    csc_matrix,
     diags,
     identity,
 )
@@ -128,7 +129,7 @@ class EllipsoidScreener:
         L = np.zeros((self.n_steps, X.shape[1]))
         while k < self.n_steps:
             if k % 10 == 0:
-                print('ELL METHOD IT : ', k)
+                print('Ellipsoid method iteration ', k)
             g = compute_subgradient(z, X, y, self.lmbda, self.mu, self.loss, self.penalty, 
                                     self.intercept, self.ars)
             if k == 0:
@@ -146,7 +147,7 @@ class EllipsoidScreener:
         self.z = z
         self.scaling = scaling
         if type(D).__name__ == 'csr_matrix':
-            L = csr_matrix(L)
+            L = csc_matrix(L)
         self.L = L.T
         self.I_k_vec = I_k_vec
         self.r_init = r_init
@@ -217,9 +218,9 @@ class EllipsoidScreener:
                     UTU = U.T.dot(U)
                     eigenval_max = np.linalg.eigvalsh(UTU)[-1]
                 else:
-                    U = self.L.multiply(self.I_k_vec)
+                    U = csc_matrix(self.L.multiply(self.I_k_vec))
                     UTU = U.T.dot(U)
-                    eigenval_max = eigsh(UTU, k=1, which='LM', return_eigenvectors=False)
+                    eigenval_max = eigsh(UTU, k=1, which='LM', return_eigenvectors=False)[0]
                 self.squared_radius = self.scaling - eigenval_max
                 print('Using minimal sphere of ellipsoid')
 
@@ -257,7 +258,7 @@ if __name__ == "__main__":
     from sklearn.model_selection import train_test_split
     from screening.loaders import load_experiment
     
-    X, y = load_experiment(dataset='rcv1', synth_params=None, size=60000, redundant=0, 
+    X, y = load_experiment(dataset='rcv1', synth_params=None, size=200000, redundant=0, 
                             noise=None, classification=True)
     
     random.seed(0)
@@ -266,9 +267,9 @@ if __name__ == "__main__":
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
     z_init = np.random.rand(X_train.shape[1])
     screener = EllipsoidScreener(lmbda=1000, mu=1, loss='squared_hinge', penalty='l2', 
-                                intercept=False, classification=True, n_ellipsoid_steps=200, 
-                                better_init=10, better_radius=0, cut=False, clip_ell=False, 
-                                sgd=False, acceleration=True, dc=False, use_sphere=True,
+                                intercept=False, classification=True, n_ellipsoid_steps=1000, 
+                                better_init=1, better_radius=0, cut=False, clip_ell=False, 
+                                sgd=False, acceleration=True, dc=False, use_sphere=False,
                                 ars=False).fit(X_train, y_train)
     prop = np.unique(y_test, return_counts=True)[1]
     print('BASELINE : ', 1 - prop[1] / prop[0])

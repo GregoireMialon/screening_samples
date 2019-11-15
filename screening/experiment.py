@@ -215,7 +215,7 @@ if __name__ == '__main__':
     parser.add_argument('--redundant', default=0, type=int, help='add redundant examples to the dataset. Do not use redundant with --size')
     parser.add_argument('--noise', default=0.1, type=float, help='standard deviation of the noise to add to the redundant examples')
     parser.add_argument('--nb_delete_steps', default=15, type=int, help='at each step of the experiment, we delete size / nb_delete_steps data points')
-    parser.add_argument('--lmbda', default=0.1, type=float, help='regularization parameter of the estimator')
+    parser.add_argument('--lmbda', default=1.0, type=float, help='regularization parameter of the estimator')
     parser.add_argument('--mu', default=1.0, type=float, help='regularization parameter of the dual')
     parser.add_argument('--classification', action='store_true')
     parser.add_argument('--loss', default='squared_hinge', choices=['hinge', 'squared_hinge', 'squared','truncated_squared', 'safe_logistic', 'logistic'])

@@ -42,6 +42,8 @@ def experiment_regpath_(dataset, synth_params, size, scale_data, redundant, nois
 
     data = {}
     for lmbda in lmbda_grid:
+        data['budget_ell_lmbda_{}'.format(lmbda)] = 0
+        data['budget_noscreen_lmbda_{}'.format(lmbda)] = 0
         data['time_ell_lmbda_{}'.format(lmbda)] = 0
         data['time_noscreen_lmbda_{}'.format(lmbda)] = 0 
         data['score_ell_lmbda_{}'.format(lmbda)] = 0
@@ -53,9 +55,11 @@ def experiment_regpath_(dataset, synth_params, size, scale_data, redundant, nois
         np.random.seed(compt_exp + 1)
         compt_exp += 1
         X_train, _, y_train, _ = train_test_split(X, y, test_size=0.2)
-    
+        
         for lmbda in lmbda_grid:
             print(' LMBDA', lmbda)
+            budget_ell = 0
+            budget_noscreen = 0
             if lmbda == lmbda_grid[0]:
                 start = time.time()
                 screener_ell = EllipsoidScreener(lmbda=lmbda, mu=mu, loss=loss, penalty=penalty, 
@@ -100,6 +104,7 @@ def experiment_regpath_(dataset, synth_params, size, scale_data, redundant, nois
                 screener_ell.fit(X_train[random_subset], y_train[random_subset], 
                                 init=screener_dg.z, rad=2 * screener_dg.dg / lmbda)
                 print('INIT RAD : ', 2 * screener_dg.dg / lmbda)
+                budget_ell += n_ellipsoid_steps * get_ell_from_subset
                 #print('FINAL RAD : ', screener_ell.squared_radius)
                 print('Z_DG', screener_dg.z, 'Z_ELL', screener_ell.z)
                 print('SCORE DG', screener_dg.score(X_train, y_train), 'SCORE ELL', screener_ell.score(X_train, y_train))
@@ -108,20 +113,22 @@ def experiment_regpath_(dataset, synth_params, size, scale_data, redundant, nois
                 tokeep_ell = np.where(scores_ell > - mu)[0]
                 svc_ell = BinaryClassifier(loss='sqhinge', penalty=penalty, intercept=intercept)
                 print('CURRENT SHAPE : ', len(tokeep_ell))
-                svc_ell.fit(X_train[tokeep_ell], y_train[tokeep_ell], solver='acc-svrg', lambd=lmbda, verbose=False)
+                budget_ell += svc_ell.fit(X_train[tokeep_ell], y_train[tokeep_ell], solver='acc-svrg', it0=1, lambd=lmbda, verbose=False)[0,-1] * len(tokeep_ell)
                 z_svc_ell = svc_ell.w
                 stop = time.time()
                 time_ell = stop - start
 
                 start = time.time()
                 svc = BinaryClassifier(loss='sqhinge', penalty=penalty, intercept=intercept)
-                svc.fit(X_train, y_train, solver='acc-svrg', lambd=lmbda, verbose=False)
+                budget_noscreen += svc.fit(X_train, y_train, solver='acc-svrg', it0=1, lambd=lmbda, verbose=False)[0,-1] * X_train.shape[0]
                 stop = time.time()
                 time_noscreen = stop - start
 
             score_ell = svc_ell.score(X_train, y_train)
             score_noscreen = svc.score(X_train, y_train)
-                                  
+
+            data['budget_ell_lmbda_{}'.format(lmbda)] += budget_ell
+            data['budget_noscreen_lmbda_{}'.format(lmbda)] += budget_noscreen      
             data['time_ell_lmbda_{}'.format(lmbda)] += time_ell
             data['time_noscreen_lmbda_{}'.format(lmbda)] += time_noscreen
             data['score_ell_lmbda_{}'.format(lmbda)] += score_ell
@@ -144,7 +151,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset', default='mnist', help='dataset used for the experiment')
     parser.add_argument('--synth_params', default=[100, 500, 10 / 500], nargs='+', type=float, help='in order: nb_samples, dimension, sparsity')
-    parser.add_argument('--size', default=1000, type=int, help='number of samples of the dataset to use')
+    parser.add_argument('--size', default=10000, type=int, help='number of samples of the dataset to use')
     parser.add_argument('--scale_data', action='store_true')
     parser.add_argument('--redundant', default=0, type=int, help='add redundant examples to the dataset. Do not use redundant with --size')
     parser.add_argument('--noise', default=0.1, type=float, help='standard deviation of the noise to add to the redundant examples')

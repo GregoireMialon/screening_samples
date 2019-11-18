@@ -131,12 +131,13 @@ def compute_A_g(scaling, L, I_k_vec, g):
         A_g = scaling * g
     return A_g
 
-
+#@profile
 def compute_A_X(scaling, L, I_k_vec, X):
     if L is not 0 and I_k_vec is not 0:
         L_X = L.T.dot(X)
-        I_k_L = csr_matrix(L_X.multiply(I_k_vec.reshape(-1,1)))
-        A_X = scaling * csr_matrix(X) - L.dot(I_k_L)
+        I_k_L = csc_matrix(L_X.multiply(I_k_vec.reshape(-1,1))) 
+        temp = L.dot(I_k_L)  # it would be faster with L = csr and I_k_L = dense but other problems appear
+        A_X = scaling * X - temp
     else:
         A_X = scaling * X
     return A_X
@@ -175,7 +176,7 @@ def compute_test_accelerated(D_i, y_i, z, scaling, L, I_k_vec, g, classification
             test = D_i.dot(z) + np.sqrt(D_i.dot(A_D_i)) - y_i
     return test
 
-
+#@profile
 def compute_test_accelerated_(Xy, z, scaling, L, I_k_vec, g, cut):
     A_X = compute_A_X(scaling, L, I_k_vec, Xy.T)
     if cut:
@@ -184,7 +185,7 @@ def compute_test_accelerated_(Xy, z, scaling, L, I_k_vec, g, cut):
         test = Xy.dot(z) - np.sqrt(np.array((A_X.T.multiply(Xy)).sum(1)).reshape(-1,))
     return test
 
-
+#@profile
 def rank_dataset_accelerated(D, y, z, scaling, L, I_k_vec, g, mu, classification, intercept, cut):
     '''
     Gives score to each sample, does not re-order the dataset
@@ -197,8 +198,8 @@ def rank_dataset_accelerated(D, y, z, scaling, L, I_k_vec, g, mu, classification
     
     if classification:
         if type(D).__name__ == 'csr_matrix':
-            Xy = csr_matrix(X.multiply(y.reshape(-1,1)))
-            scores = - compute_test_accelerated_(Xy, z, scaling, L, I_k_vec, g, cut)
+            Xy = csc_matrix(X.multiply(y.reshape(-1,1)))
+            scores = compute_test_accelerated_(Xy, z, scaling, L, I_k_vec, g, cut)
         else:
             Xy = y.reshape(-1,1) * X
             scores = - np.array([compute_test_accelerated(sample, None, z, scaling, L, I_k_vec, 

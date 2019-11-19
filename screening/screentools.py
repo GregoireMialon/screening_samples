@@ -204,7 +204,9 @@ def rank_dataset_accelerated(D, y, z, scaling, L, I_k_vec, g, mu, classification
     if classification:
         if type(D).__name__ == 'csr_matrix':
             Xy = csc_matrix(X.multiply(y.reshape(-1,1)))
-            scores = compute_test_accelerated_(Xy, z, scaling, L, I_k_vec, g, cut)
+            scores = - compute_test_accelerated_(Xy, z, scaling, L, I_k_vec, g, cut)
+            #scores = - np.array([compute_test_accelerated(sample.toarray().reshape(-1,), None, z, scaling, L, I_k_vec, 
+                                                    #g, classification, cut) for sample in Xy]) other version juste in case
         else:
             Xy = y.reshape(-1,1) * X
             scores = - np.array([compute_test_accelerated(sample, None, z, scaling, L, I_k_vec, 

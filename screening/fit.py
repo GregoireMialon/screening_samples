@@ -20,8 +20,11 @@ def fit_estimator(X, y, loss, penalty, mu, lmbda, intercept, max_iter=10000, ars
     elif loss == 'squared_hinge' and ars:
         estimator = BinaryClassifier(loss='sqhinge', penalty=penalty, intercept=intercept)
         estimator.fit(X, y, lambd=lmbda, solver='acc-svrg', nepochs=max_iter, verbose=False)            
-    elif loss == 'safe_logistic':
+    elif loss == 'safe_logistic' and not(ars):
         estimator = SafeLogistic(mu=mu, lmbda=lmbda, penalty=penalty, max_iter=max_iter).fit(X, y)
+    elif loss == 'safe_logistic' and ars:
+        estimator = BinaryClassifier(loss='safe-logistic', penalty='l1', intercept=intercept)
+        estimator.fit(X, y, lambd=lmbda, solver='acc-svrg', nepochs=max_iter, verbose=False)
     elif loss == 'logistic':
         estimator = LogisticRegression(C=1/lmbda, penalty=penalty, fit_intercept=intercept).fit(X, y)            
     else:

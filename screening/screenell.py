@@ -258,7 +258,7 @@ if __name__ == "__main__":
     from sklearn.model_selection import train_test_split
     from screening.loaders import load_experiment
     
-    X, y = load_experiment(dataset='rcv1', synth_params=None, size=200000, redundant=0, 
+    X, y = load_experiment(dataset='rcv1', synth_params=None, size=10000, redundant=0, 
                             noise=None, classification=True)
     
     random.seed(0)
@@ -266,14 +266,16 @@ if __name__ == "__main__":
 
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
     z_init = np.random.rand(X_train.shape[1])
-    screener = EllipsoidScreener(lmbda=1000, mu=1, loss='squared_hinge', penalty='l2', 
-                                intercept=False, classification=True, n_ellipsoid_steps=1000, 
+    screener = EllipsoidScreener(lmbda=1, mu=1, loss='squared_hinge', penalty='l2', 
+                                intercept=False, classification=True, n_ellipsoid_steps=10, 
                                 better_init=1, better_radius=0, cut=False, clip_ell=False, 
                                 sgd=False, acceleration=True, dc=False, use_sphere=False,
                                 ars=False).fit(X_train, y_train)
     prop = np.unique(y_test, return_counts=True)[1]
     print('BASELINE : ', 1 - prop[1] / prop[0])
-    #print(screener.score(X_test, y_test))
+    print(screener.score(X_test, y_test))
     #print(screener.z)
-    print(screener.screen(X_train[:5], y_train[:5]))
+    print(screener.screen(X_train[:10], y_train[:10]))
+
+
 

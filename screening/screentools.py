@@ -135,8 +135,9 @@ def compute_A_g(scaling, L, I_k_vec, g):
 def compute_A_X(scaling, L, I_k_vec, X):
     if L is not 0 and I_k_vec is not 0:
         L_X = L.T.dot(X)
-        I_k_L = csc_matrix(L_X.multiply(I_k_vec.reshape(-1,1))) 
-        temp = L.dot(I_k_L)  # it would be faster with L = csr and I_k_L = dense but other problems appear
+        #I_k_L = csc_matrix(L_X.multiply(I_k_vec.reshape(-1,1))) 
+        I_k_L = L_X.multiply(I_k_vec.reshape(-1,1)).toarray()
+        temp = L.dot(I_k_L)
         A_X = scaling * X - temp
     else:
         A_X = scaling * X
@@ -182,7 +183,11 @@ def compute_test_accelerated_(Xy, z, scaling, L, I_k_vec, g, cut):
     if cut:
         pass
     else:
-        test = Xy.dot(z) - np.sqrt(np.array((A_X.T.multiply(Xy)).sum(1)).reshape(-1,))
+        if L is 0 and I_k_vec is 0:
+            test = Xy.dot(z) - np.sqrt(np.array((A_X.T.multiply(Xy)).sum(1)).reshape(-1,))
+        else:
+            #test = Xy.dot(z) - np.sqrt(np.array((A_X.T.multiply(Xy)).sum(1)).reshape(-1,))
+            test = Xy.dot(z) - np.sqrt(np.squeeze(np.asarray((Xy.multiply(A_X.T)).sum(1))))
     return test
 
 #@profile

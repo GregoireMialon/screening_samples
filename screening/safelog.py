@@ -21,14 +21,14 @@ class SafeLogistic:
 
     def fit(self, D, y):
         safelog = BinaryClassifier(loss='safe-logistic', penalty='l1')
-        safelog.fit(D, y, lambd=self.lmbda, solver='qning-svrg', nepochs=self.max_iter, 
-                    verbose=True)
-        self.coef = safelog.w
+        safelog.fit(D, y, lambd=self.lmbda, solver='qning-miso', nepochs=self.max_iter, 
+                    verbose=False)
+        self.coef_ = np.array([safelog.w])
         return self
     
     
     def predict(self, D):
-        return np.sign(D.dot(self.coef))
+        return np.sign(D.dot(self.coef_[0]))
 
 
     def score(self, D, y):
@@ -36,7 +36,6 @@ class SafeLogistic:
         outputs_ = [1 if output > 0 else 0 for output in outputs]
         return np.sum(outputs_) / D.shape[0]
 
-    
     
 if __name__ == "__main__":
     #unit test

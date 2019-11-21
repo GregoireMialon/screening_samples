@@ -86,9 +86,9 @@ def experiment_reg(dataset, synth_params, size, scale_data, redundant, noise, nb
         if guarantee:
             idx_safeell = np.where(scores_screenell > -mu)[0]
             if len(idx_safeell) !=0:
-                estimator_whole = fit_estimator(X_train, y_train, loss, penalty, mu, lmbda, intercept, ars=True)
+                estimator_whole = fit_estimator(X_train, y_train, loss, penalty, mu, lmbda, intercept)
                 estimator_screened = fit_estimator(X_train[idx_safeell], y_train[idx_safeell], loss, 
-                                penalty, mu, lmbda, intercept, ars=True)
+                                penalty, mu, lmbda, intercept)
                 temp = np.array([estimator_whole.score(X_train, y_train),
                                             estimator_screened.score(X_train, y_train)])
                 safe_guarantee += temp
@@ -121,11 +121,10 @@ def experiment_reg(dataset, synth_params, size, scale_data, redundant, noise, nb
                     compt += 1
                     if i == 0:
                         estimator_regular = fit_estimator(X_train, y_train, loss=loss, penalty=penalty, mu=mu, lmbda=lmbda, 
-                                                            intercept=intercept, max_iter=1000, ars=True)
+                                                            intercept=intercept)
                     estimator_screenell = fit_estimator(X_screenell, y_screenell, loss=loss, penalty=penalty, mu=mu, lmbda=lmbda, 
-                    intercept=intercept, max_iter=1000, ars=True)
-                    estimator_r = fit_estimator(X_r, y_r, loss=loss, penalty=penalty, mu=mu, lmbda=lmbda, intercept=intercept, 
-                                                max_iter=1000, ars=True)
+                    intercept=intercept)
+                    estimator_r = fit_estimator(X_r, y_r, loss=loss, penalty=penalty, mu=mu, lmbda=lmbda, intercept=intercept)
                     
                     if i == 0:
                         score_regular += estimator_regular.score(X_test, y_test)
@@ -175,7 +174,7 @@ if __name__ == '__main__':
     parser.add_argument('--nb_delete_steps', default=12, type=int, help='at each step of the experiment, we delete size / nb_delete_steps data points')
     parser.add_argument('--lmbda', default=0.1, type=float, help='regularization parameter of the estimator')
     parser.add_argument('--mu', default=1.0, type=float, help='regularization parameter of the dual')
-    parser.add_argument('--loss', default='logistic', choices=['hinge', 'squared_hinge', 'squared','truncated_squared', 'safe_logistic', 'logistic'])
+    parser.add_argument('--loss', default='safe_logistic', choices=['hinge', 'squared_hinge', 'squared','truncated_squared', 'safe_logistic', 'logistic'])
     parser.add_argument('--penalty', default='l1', choices=['l1','l2'])
     parser.add_argument('--intercept', action='store_true')
     parser.add_argument('--n_ellipsoid_steps', default=10, type=int, help='number of iterations of the ellipsoid method')

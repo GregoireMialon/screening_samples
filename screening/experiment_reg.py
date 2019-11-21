@@ -86,12 +86,13 @@ def experiment_reg(dataset, synth_params, size, scale_data, redundant, noise, nb
         if guarantee:
             idx_safeell = np.where(scores_screenell > -mu)[0]
             if len(idx_safeell) !=0:
-                estimator_whole = fit_estimator(X_train, y_train, loss, penalty, mu, lmbda, intercept)
+                estimator_whole = fit_estimator(X_train, y_train, loss, penalty, mu, lmbda, intercept, ars=True)
                 estimator_screened = fit_estimator(X_train[idx_safeell], y_train[idx_safeell], loss, 
-                                penalty, mu, lmbda, intercept)
-                safe_guarantee = np.array([estimator_whole.score(X_train, y_train),
+                                penalty, mu, lmbda, intercept, ars=True)
+                temp = np.array([estimator_whole.score(X_train, y_train),
                                             estimator_screened.score(X_train, y_train)])
-                print('SAFE GUARANTEE : ', safe_guarantee)
+                safe_guarantee += temp
+                print('SAFE GUARANTEE : ', temp)
 
         if nb_delete_steps != 0:
             nb_to_del_table = np.sqrt(np.linspace(1, X_train.shape[0], nb_delete_steps, dtype='int'))
@@ -119,10 +120,12 @@ def experiment_reg(dataset, synth_params, size, scale_data, redundant, noise, nb
                 while compt < nb_test:
                     compt += 1
                     if i == 0:
-                        estimator_regular = fit_estimator(X_train, y_train, loss=loss, penalty=penalty, mu=mu, lmbda=lmbda, intercept=intercept)
+                        estimator_regular = fit_estimator(X_train, y_train, loss=loss, penalty=penalty, mu=mu, lmbda=lmbda, 
+                                                            intercept=intercept, max_iter=1000, ars=True)
                     estimator_screenell = fit_estimator(X_screenell, y_screenell, loss=loss, penalty=penalty, mu=mu, lmbda=lmbda, 
-                    intercept=intercept)
-                    estimator_r = fit_estimator(X_r, y_r, loss=loss, penalty=penalty, mu=mu, lmbda=lmbda, intercept=intercept)
+                    intercept=intercept, max_iter=1000, ars=True)
+                    estimator_r = fit_estimator(X_r, y_r, loss=loss, penalty=penalty, mu=mu, lmbda=lmbda, intercept=intercept, 
+                                                max_iter=1000, ars=True)
                     
                     if i == 0:
                         score_regular += estimator_regular.score(X_test, y_test)

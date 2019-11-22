@@ -25,7 +25,7 @@ from screening.settings import RESULTS_PATH
 import random
 import os
 
-#@profile
+@profile
 def experiment_reg(dataset, synth_params, size, scale_data, redundant, noise, nb_delete_steps, lmbda, mu, 
                 loss, penalty, intercept, n_ellipsoid_steps, better_init, better_radius, cut, get_ell_from_subset, 
                 clip_ell, use_sphere, guarantee, nb_exp, nb_test, plot, zoom, dontsave):

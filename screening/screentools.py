@@ -131,14 +131,13 @@ def compute_A_g(scaling, L, I_k_vec, g):
         A_g = scaling * g
     return A_g
 
-#@profile
+@profile
 def compute_A_X(scaling, L, I_k_vec, X):
     if L is not 0 and I_k_vec is not 0:
         L_X = L.T.dot(X)
-        #I_k_L = csc_matrix(L_X.multiply(I_k_vec.reshape(-1,1))) 
-        I_k_L = L_X.multiply(I_k_vec.reshape(-1,1)).toarray()
-        temp = L.dot(I_k_L)
-        A_X = scaling * X - temp
+        I_k_L = csc_matrix(L_X.multiply(I_k_vec.reshape(-1,1))) 
+        #I_k_L = L_X.multiply(I_k_vec.reshape(-1,1)).toarray() #faster L.dot(I_k_L) but requires too much memory
+        A_X = scaling * X - L.dot(I_k_L)
     else:
         A_X = scaling * X
     return A_X
@@ -177,7 +176,7 @@ def compute_test_accelerated(D_i, y_i, z, scaling, L, I_k_vec, g, classification
             test = D_i.dot(z) + np.sqrt(D_i.dot(A_D_i)) - y_i
     return test
 
-#@profile
+@profile
 def compute_test_accelerated_(Xy, z, scaling, L, I_k_vec, g, cut):
     A_X = compute_A_X(scaling, L, I_k_vec, Xy.T)
     if cut:
@@ -186,8 +185,8 @@ def compute_test_accelerated_(Xy, z, scaling, L, I_k_vec, g, cut):
         if L is 0 and I_k_vec is 0:
             test = Xy.dot(z) - np.sqrt(np.array((A_X.T.multiply(Xy)).sum(1)).reshape(-1,))
         else:
-            #test = Xy.dot(z) - np.sqrt(np.array((A_X.T.multiply(Xy)).sum(1)).reshape(-1,))
-            test = Xy.dot(z) - np.sqrt(np.squeeze(np.asarray((Xy.multiply(A_X.T)).sum(1))))
+            test = Xy.dot(z) - np.sqrt(np.array((A_X.T.multiply(Xy)).sum(1)).reshape(-1,))
+            #test = Xy.dot(z) - np.sqrt(np.squeeze(np.asarray((Xy.multiply(A_X.T)).sum(1))))
     return test
 
 #@profile
@@ -206,7 +205,7 @@ def rank_dataset_accelerated(D, y, z, scaling, L, I_k_vec, g, mu, classification
             Xy = csc_matrix(X.multiply(y.reshape(-1,1)))
             scores = - compute_test_accelerated_(Xy, z, scaling, L, I_k_vec, g, cut)
             #scores = - np.array([compute_test_accelerated(sample.toarray().reshape(-1,), None, z, scaling, L, I_k_vec, 
-                                                    #g, classification, cut) for sample in Xy]) other version juste in case
+                                                    #g, classification, cut) for sample in Xy]) #other version juste in case
         else:
             Xy = y.reshape(-1,1) * X
             scores = - np.array([compute_test_accelerated(sample, None, z, scaling, L, I_k_vec, 

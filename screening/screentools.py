@@ -131,7 +131,7 @@ def compute_A_g(scaling, L, I_k_vec, g):
         A_g = scaling * g
     return A_g
 
-@profile
+#@profile
 def compute_A_X(scaling, L, I_k_vec, X):
     if L is not 0 and I_k_vec is not 0:
         L_X = L.T.dot(X)
@@ -176,7 +176,7 @@ def compute_test_accelerated(D_i, y_i, z, scaling, L, I_k_vec, g, classification
             test = D_i.dot(z) + np.sqrt(D_i.dot(A_D_i)) - y_i
     return test
 
-@profile
+#@profile
 def compute_test_accelerated_(Xy, z, scaling, L, I_k_vec, g, cut):
     A_X = compute_A_X(scaling, L, I_k_vec, Xy.T)
     if cut:

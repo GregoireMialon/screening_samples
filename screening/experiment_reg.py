@@ -42,7 +42,7 @@ def experiment_reg(dataset, synth_params, size, scale_data, redundant, noise, nb
     scores_regular_all = []
     scores_ell_all = []
     scores_r_all = []
-    safe_guarantee = np.array([0, 0])
+    safe_guarantee = np.array([0., 0.])
 
     compt_exp = 0
     nb_safe_ell_all = 0

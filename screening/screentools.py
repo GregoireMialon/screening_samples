@@ -143,14 +143,14 @@ def compute_A_X(scaling, L, I_k_vec, X):
     return A_X
 
 
-@profile
+#@profile
 def compute_A_X_(L, I_k_vec, X):
     L_X = L.T.dot(X)
     #I_k_L = csc_matrix(L_X.multiply(I_k_vec.reshape(-1,1))) 
     I_k_L = L_X.multiply(I_k_vec.reshape(-1,1)).toarray() #faster L.dot(I_k_L) but requires too much memory
     return L.dot(I_k_L)
 
-@profile
+#@profile
 def compute_A_X__(L, I_k_vec, X):
     L_X = L.T.dot(X)
     #I_k_L = csc_matrix(L_X.multiply(I_k_vec.reshape(-1,1))) 
@@ -204,7 +204,7 @@ def compute_test_accelerated_(Xy, z, scaling, L, I_k_vec, g, cut):
     return test
 
 
-@profile
+#@profile
 def compute_test_accelerated__(Xy, z, scaling, L, I_k_vec, g, cut):
     if cut:
         pass
@@ -219,7 +219,7 @@ def compute_test_accelerated__(Xy, z, scaling, L, I_k_vec, g, cut):
     return test
 
 
-@profile
+#@profile
 def compute_test_accelerated___(Xy, z, scaling, L, I_k_vec, g, cut):
     if cut:
         pass
@@ -235,7 +235,7 @@ def compute_test_accelerated___(Xy, z, scaling, L, I_k_vec, g, cut):
     return test
 
 
-@profile
+#@profile
 def rank_dataset_accelerated(D, y, z, scaling, L, I_k_vec, g, mu, classification, intercept, cut):
     '''
     Gives score to each sample, does not re-order the dataset

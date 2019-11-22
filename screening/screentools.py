@@ -143,6 +143,20 @@ def compute_A_X(scaling, L, I_k_vec, X):
     return A_X
 
 
+@profile
+def compute_A_X_(L, I_k_vec, X):
+    L_X = L.T.dot(X)
+    #I_k_L = csc_matrix(L_X.multiply(I_k_vec.reshape(-1,1))) 
+    I_k_L = L_X.multiply(I_k_vec.reshape(-1,1)).toarray() #faster L.dot(I_k_L) but requires too much memory
+    return L.dot(I_k_L)
+
+@profile
+def compute_A_X__(L, I_k_vec, X):
+    L_X = L.T.dot(X)
+    #I_k_L = csc_matrix(L_X.multiply(I_k_vec.reshape(-1,1))) 
+    I_k_L = L_X.multiply(I_k_vec.reshape(-1,1)).toarray() #faster L.dot(I_k_L) but requires too much memory
+    return L.dot(I_k_L)
+
 def compute_test_accelerated(D_i, y_i, z, scaling, L, I_k_vec, g, classification, cut):
     A_D_i = compute_A_g(scaling, L, I_k_vec, D_i).T
     if classification:
@@ -189,7 +203,39 @@ def compute_test_accelerated_(Xy, z, scaling, L, I_k_vec, g, cut):
             #test = Xy.dot(z) - np.sqrt(np.squeeze(np.asarray((Xy.multiply(A_X.T)).sum(1))))
     return test
 
-#@profile
+
+@profile
+def compute_test_accelerated__(Xy, z, scaling, L, I_k_vec, g, cut):
+    if cut:
+        pass
+    else:
+        if L is 0 and I_k_vec is 0:
+            test = Xy.dot(z) - np.sqrt(np.array((scaling * (Xy.multiply(Xy))).sum(1)).reshape(-1,))
+        else:
+            A_X = compute_A_X_(L, I_k_vec, Xy.T)
+            scores = np.array((scaling * (Xy.multiply(Xy)) - Xy.multiply(A_X.T)).sum(1))
+            test = Xy.dot(z) - np.sqrt(scores).reshape(-1,)
+            #test = Xy.dot(z) - np.sqrt(np.squeeze(np.asarray((Xy.multiply(A_X.T)).sum(1))))
+    return test
+
+
+@profile
+def compute_test_accelerated___(Xy, z, scaling, L, I_k_vec, g, cut):
+    if cut:
+        pass
+    else:
+        if L is 0 and I_k_vec is 0:
+            test = Xy.dot(z) - np.sqrt(np.array((scaling * (Xy.multiply(Xy))).sum(1)).reshape(-1,))
+        else:
+            L_X = L.T.dot(Xy.T)
+            I_k_L = L_X.multiply(I_k_vec.reshape(-1,1)).toarray()
+            s_1 = scaling * (Xy.multiply(Xy)).sum(1)
+            s_2 = - L_X.T.multiply(I_k_L.T).sum(1)
+            test = Xy.dot(z) - np.sqrt(np.array(s_1 + s_2)).reshape(-1,)
+    return test
+
+
+@profile
 def rank_dataset_accelerated(D, y, z, scaling, L, I_k_vec, g, mu, classification, intercept, cut):
     '''
     Gives score to each sample, does not re-order the dataset
@@ -203,7 +249,7 @@ def rank_dataset_accelerated(D, y, z, scaling, L, I_k_vec, g, mu, classification
     if classification:
         if type(D).__name__ == 'csr_matrix':
             Xy = csc_matrix(X.multiply(y.reshape(-1,1)))
-            scores = - compute_test_accelerated_(Xy, z, scaling, L, I_k_vec, g, cut)
+            scores = - compute_test_accelerated___(Xy, z, scaling, L, I_k_vec, g, cut)
             #scores = - np.array([compute_test_accelerated(sample.toarray().reshape(-1,), None, z, scaling, L, I_k_vec, 
                                                     #g, classification, cut) for sample in Xy]) #other version juste in case
         else:

@@ -109,17 +109,9 @@ if __name__ == "__main__":
     prop = np.unique(y_test, return_counts=True)[1]
     print('BASELINE : ', 1 - prop[1] / prop[0])
 
-    epoch=20
+    epoch=10
     
     screener = DualityGapScreener(lmbda=0.001, n_epochs=epoch, ars=True).fit(X_train, y_train)
-    print('DUALITY GAP LAMBDA 1.0 ; ', screener.dg)
-    print('SCORE', screener.score(X_test, y_test))
-    print('COEF', screener.z)
-    screener = DualityGapScreener(lmbda=0.0009, n_epochs=1, ars=True).fit(X_train, y_train, init=screener.z)
-    print('DUALITY GAP LAMBDA 0.9 : ', screener.dg)
-    print('SCORE', screener.score(X_test, y_test))
-    print('COEF', screener.z)
-    screener = DualityGapScreener(lmbda=0.0008, n_epochs=1, ars=True).fit(X_train, y_train, init=screener.z)
-    print('DUALITY GAP LAMBDA 0.8 : ', screener.dg)
+    print('DUALITY GAP LAMBDA 0.001 ; ', screener.dg)
     print('SCORE', screener.score(X_test, y_test))
     print('COEF', screener.z)

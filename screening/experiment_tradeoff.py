@@ -69,7 +69,8 @@ def experiment_tradeoff(dataset, synth_params, size, scale_data, redundant, nois
                                                                             init=z_init, rad=rad_init)
                 scores = screener_ell.screen(X_train, y_train)
                 scores_screening_all[i] += get_nb_safe(scores, mu, classification=True)
-                print('SCREEN ELL RADIUS', screener_ell.squared_radius)
+                if use_sphere:
+                    print('SCREEN ELL RADIUS', screener_ell.squared_radius)
 
         if guarantee:
             scores = screener_ell.score(X_train, y_train)

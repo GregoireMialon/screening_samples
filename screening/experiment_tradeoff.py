@@ -40,7 +40,7 @@ def experiment_tradeoff(dataset, synth_params, size, scale_data, redundant, nois
     print(exp_title)
 
     scores_screening_all = np.zeros(better_init + n_ellipsoid_steps)
-    safe_guarantee = np.array([0, 0])
+    safe_guarantee = np.array([0., 0.])
     
     compt_exp = 0
     
@@ -73,8 +73,9 @@ def experiment_tradeoff(dataset, synth_params, size, scale_data, redundant, nois
                     print('SCREEN ELL RADIUS', screener_ell.squared_radius)
 
         if guarantee:
-            scores = screener_ell.score(X_train, y_train)
-            idx_safeell = np.where(scores > -mu)[0]
+            idx_safeell = np.where(scores > - mu)[0]
+            print('SCORES ', scores)
+            print('NB TO KEEP', len(idx_safeell))
             if len(idx_safeell) !=0:
                 estimator_whole = fit_estimator(X_train, y_train, loss, penalty, mu, lmbda, intercept)
                 estimator_screened = fit_estimator(X_train[idx_safeell], y_train[idx_safeell], loss, 

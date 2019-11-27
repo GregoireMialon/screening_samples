@@ -46,8 +46,8 @@ def experiment_tradeoff(dataset, synth_params, size, scale_data, redundant, nois
     compt_exp = 0
     
     while compt_exp < nb_exp:
-        random.seed(compt_exp + 1)
-        np.random.seed(compt_exp + 1)
+        #random.seed(compt_exp + 1)
+        #np.random.seed(compt_exp + 1)
         compt_exp += 1
         X_train, _, y_train, _ = train_test_split(X, y, test_size=0.2)
 

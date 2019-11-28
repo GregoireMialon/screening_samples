@@ -27,16 +27,21 @@ import os
 
 #@profile
 def experiment_tradeoff(dataset, synth_params, size, scale_data, redundant, noise, lmbda, mu, 
-                loss, penalty, intercept, n_ellipsoid_steps, better_init, cut, get_ell_from_subset, clip_ell, 
+                loss, penalty, intercept, acc, n_ellipsoid_steps, better_init, cut, get_ell_from_subset, clip_ell, 
                 use_sphere, guarantee, nb_exp, plot, zoom, dontsave):
     
     print('START')
 
     X, y = load_experiment(dataset, synth_params, size, redundant, noise, classification=True)
 
-    exp_title = 'X_size_{}_ell_subset_{}_loss_{}_lmbda_{}_n_ellipsoid_{}_mu_{}_better_init_{}_cut_ell_{}_clip_ell_{}_use_sphere_{}_tradeoff'.format(size, 
-        get_ell_from_subset, loss, lmbda, n_ellipsoid_steps, mu, better_init, 
-        cut, clip_ell, use_sphere)
+    if acc:
+        exp_title = 'X_size_{}_ell_subset_{}_loss_{}_lmbda_{}_n_ellipsoid_{}_mu_{}_better_init_{}_cut_ell_{}_clip_ell_{}_use_sphere_{}_acc'.format(size, 
+            get_ell_from_subset, loss, lmbda, n_ellipsoid_steps, mu, better_init, 
+            cut, clip_ell, use_sphere)
+    else:
+        exp_title = 'X_size_{}_ell_subset_{}_loss_{}_lmbda_{}_n_ellipsoid_{}_mu_{}_better_init_{}_cut_ell_{}_clip_ell_{}_use_sphere_{}_tradeoff'.format(size, 
+            get_ell_from_subset, loss, lmbda, n_ellipsoid_steps, mu, better_init, 
+            cut, clip_ell, use_sphere)
     print(exp_title)
 
     nb_epochs = int(better_init + n_ellipsoid_steps * get_ell_from_subset / (0.8 * X.shape[0]))
@@ -49,44 +54,54 @@ def experiment_tradeoff(dataset, synth_params, size, scale_data, redundant, nois
         #random.seed(compt_exp + 1)
         #np.random.seed(compt_exp + 1)
         compt_exp += 1
-        X_train, _, y_train, _ = train_test_split(X, y, test_size=0.2)
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
 
-        #random_subset = random.sample(range(0, X_train.shape[0]), get_ell_from_subset)
-        for i in range(nb_epochs):
-            i = i + 1
-            if i <= better_init:
-                screener_dg = DualityGapScreener(lmbda=lmbda, n_epochs=i).fit(X_train, y_train)
-                z_init = screener_dg.z
-                rad_init = screener_dg.squared_radius
-                scores = screener_dg.screen(X_train, y_train)
-                scores_screening_all[i - 1] += get_nb_safe(scores, mu, classification=True)
-                print('SCREEN DG RADIUS', screener_dg.squared_radius)
-            elif better_init < i <= nb_epochs:
-                screener_ell = EllipsoidScreener(lmbda=lmbda, mu=mu, loss=loss, penalty=penalty, 
-                                        intercept=intercept, classification=True, 
-                                        n_ellipsoid_steps= int((i - better_init) * X_train.shape[0] / get_ell_from_subset), 
-                                        better_init=0, better_radius=0, 
-                                        cut=cut, clip_ell=clip_ell, 
-                                        use_sphere=use_sphere).fit(X_train, y_train, 
-                                                                            init=z_init, rad=rad_init)
-                scores = screener_ell.screen(X_train, y_train)
-                scores_screening_all[i - 1] += get_nb_safe(scores, mu, classification=True)
-                if use_sphere:
-                    print('SCREEN ELL RADIUS', screener_ell.squared_radius)
+        if acc:
+            for i in range(nb_epochs):
+                estimator = LinearSVC(loss='squared_hinge', dual=False, C=1/lmbda, fit_intercept=False, 
+                            max_iter=i+1, tol=1.0e-20).fit(X_train, y_train)
+                scores_screening_all[i] += estimator.score(X_test, y_test)
+                print(scores_screening_all[i])
+            print('SCORES', scores_screening_all)
+        else:
+            for i in range(nb_epochs):
+                i = i + 1
+                if i <= better_init:
+                    screener_dg = DualityGapScreener(lmbda=lmbda, n_epochs=i).fit(X_train, y_train)
+                    z_init = screener_dg.z
+                    rad_init = screener_dg.squared_radius
+                    scores = screener_dg.screen(X_train, y_train)
+                    scores_screening_all[i - 1] += get_nb_safe(scores, mu, classification=True)
+                    print('SCREEN DG RADIUS', screener_dg.squared_radius)
+                elif better_init < i <= nb_epochs:
+                    random_subset = random.sample(range(0, X_train.shape[0]), get_ell_from_subset)
+                    screener_ell = EllipsoidScreener(lmbda=lmbda, mu=mu, loss=loss, penalty=penalty, 
+                                            intercept=intercept, classification=True, 
+                                            n_ellipsoid_steps= int((i - better_init) * X_train.shape[0] / get_ell_from_subset), 
+                                            better_init=0, better_radius=0, 
+                                            cut=cut, clip_ell=clip_ell, 
+                                            use_sphere=use_sphere).fit(X_train[random_subset], y_train[random_subset], 
+                                                                                init=z_init, rad=rad_init)
+                    scores = screener_ell.screen(X_train, y_train)
+                    scores_screening_all[i - 1] += get_nb_safe(scores, mu, classification=True)
+                    if use_sphere:
+                        print('SCREEN ELL RADIUS', screener_ell.squared_radius)
 
-        if guarantee:
-            idx_safeell = np.where(scores > - mu)[0]
-            print('SCORES ', scores)
-            print('NB TO KEEP', len(idx_safeell))
-            if len(idx_safeell) !=0:
-                estimator_whole = fit_estimator(X_train, y_train, loss, penalty, mu, lmbda, intercept)
-                estimator_screened = fit_estimator(X_train[idx_safeell], y_train[idx_safeell], loss, 
-                                penalty, mu, lmbda, intercept)
-                temp = np.array([estimator_whole.score(X_train, y_train), 
-                            estimator_screened.score(X_train, y_train)])
-                print('SAFE GUARANTEE : ', temp)
-                safe_guarantee += temp
-        
+            if guarantee:
+                idx_safeell = np.where(scores > - mu)[0]
+                print('SCORES ', scores)
+                print('NB TO KEEP', len(idx_safeell))
+                if len(idx_safeell) !=0:
+                    estimator_whole = fit_estimator(X_train, y_train, loss, penalty, mu, lmbda, intercept)
+                    estimator_screened = fit_estimator(X_train[idx_safeell], y_train[idx_safeell], loss, 
+                                    penalty, mu, lmbda, intercept)
+                    temp = np.array([estimator_whole.score(X_train, y_train), 
+                                estimator_screened.score(X_train, y_train)])
+                    print('SAFE GUARANTEE : ', temp)
+                    safe_guarantee += temp
+    
+    if acc:
+        scores_screening_all = scores_screening_all * X_train.shape[0]
     data = {
         'step_table': better_init + n_ellipsoid_steps * (get_ell_from_subset / X_train.shape[0]),
         'scores_screening': scores_screening_all / (X_train.shape[0] * nb_exp),
@@ -119,10 +134,11 @@ if __name__ == '__main__':
     parser.add_argument('--loss', default='squared_hinge', choices=['hinge', 'squared_hinge', 'squared','truncated_squared', 'safe_logistic', 'logistic'])
     parser.add_argument('--penalty', default='l2', choices=['l1','l2'])
     parser.add_argument('--intercept', action='store_true')
+    parser.add_argument('--acc', action='store_true', help='for plot accuracy of estimator vs epoch')
     parser.add_argument('--n_ellipsoid_steps', default=10, type=int, help='number of ellipsoid steps to be done')
     parser.add_argument('--better_init', default=1, type=int, help='number of optimizer gradient steps to initialize the center of the ellipsoid')
     parser.add_argument('--cut_ell', action='store_true', help='cut the final ellipsoid in half using a subgradient of the loss')
-    parser.add_argument('--get_ell_from_subset', default=0.8 * 60000, type=int, help='train the ellipsoid on a random subset of the dataset')
+    parser.add_argument('--get_ell_from_subset', default=int(0.8 * 60000), type=int, help='train the ellipsoid on a random subset of the dataset')
     parser.add_argument('--clip_ell', action='store_true', help='clip the eigenvalues of the ellipsoid')
     parser.add_argument('--use_sphere', action='store_true', help='the region is a sphere whose radius is the smallest semi-axe of the ellipsoid')
     parser.add_argument('--guarantee', action='store_true', help='check whether the deleted points were safe')
@@ -134,7 +150,7 @@ if __name__ == '__main__':
 
 
     experiment_tradeoff(args.dataset, args.synth_params, args.size, args.scale_data, args.redundant, args.noise, 
-                args.lmbda, args.mu, args.loss, args.penalty, args.intercept, 
+                args.lmbda, args.mu, args.loss, args.penalty, args.intercept, args.acc,
                 args.n_ellipsoid_steps, args.better_init, args.cut_ell, 
                 args.get_ell_from_subset, args.clip_ell, args.use_sphere, args.guarantee, 
                 args.nb_exp, args.plot, args.zoom, args.dontsave)

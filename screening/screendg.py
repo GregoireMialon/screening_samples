@@ -55,7 +55,7 @@ class DualityGapScreener:
         self.y_train = y_train
     
         if self.ars:
-            svc = BinaryClassifier(loss='sqhinge', penalty='l2', intercept=False)
+            svc = BinaryClassifier(loss='sqhinge', penalty='l2')
             if init is not None:
                 svc.w = init
                 restart = True
@@ -100,8 +100,8 @@ if __name__ == "__main__":
 
     X, y = load_experiment(dataset='mnist', synth_params=None, size=1000, redundant=0, 
                             noise=None, classification=True)
-    random.seed(0)
-    np.random.seed(0)
+    #random.seed(0)
+    #np.random.seed(0)
 
 
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
@@ -109,9 +109,18 @@ if __name__ == "__main__":
     prop = np.unique(y_test, return_counts=True)[1]
     print('BASELINE : ', 1 - prop[1] / prop[0])
 
-    epoch=10
+    #epoch=10
     
-    screener = DualityGapScreener(lmbda=0.001, n_epochs=epoch, ars=True).fit(X_train, y_train)
-    print('DUALITY GAP LAMBDA 0.001 ; ', screener.dg)
-    print('SCORE', screener.score(X_test, y_test))
-    print('COEF', screener.z)
+    #screener = DualityGapScreener(lmbda=0.001, n_epochs=epoch, ars=True).fit(X_train, y_train)
+    #print('DUALITY GAP LAMBDA 0.001 ; ', screener.dg)
+    #print('SCORE', screener.score(X_test, y_test))
+    #print('COEF', screener.z)
+
+    compt = 0
+    while compt < 20:
+        svc_ell = BinaryClassifier(loss='sqhinge', penalty='l2')
+        budget_fit_solver = svc_ell.fit(X_train, y_train, solver='qning-svrg', it0=1, lambd=9e-5, verbose=False)[0,-1] #* X_train.shape[0] #len(tokeep_ell)
+        print(budget_fit_solver)
+        compt += 1
+
+    

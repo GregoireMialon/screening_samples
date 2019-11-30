@@ -136,7 +136,7 @@ if __name__ == '__main__':
     parser.add_argument('--intercept', action='store_true')
     parser.add_argument('--acc', action='store_true', help='for plot accuracy of estimator vs epoch')
     parser.add_argument('--n_ellipsoid_steps', default=10, type=int, help='number of ellipsoid steps to be done')
-    parser.add_argument('--better_init', default=1, type=int, help='number of optimizer gradient steps to initialize the center of the ellipsoid')
+    parser.add_argument('--better_init', default=2, type=int, help='number of optimizer gradient steps to initialize the center of the ellipsoid')
     parser.add_argument('--cut_ell', action='store_true', help='cut the final ellipsoid in half using a subgradient of the loss')
     parser.add_argument('--get_ell_from_subset', default=int(0.8 * 60000), type=int, help='train the ellipsoid on a random subset of the dataset')
     parser.add_argument('--clip_ell', action='store_true', help='clip the eigenvalues of the ellipsoid')

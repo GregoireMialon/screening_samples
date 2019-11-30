@@ -29,24 +29,24 @@ import time
 
 #@profile
 
-random.seed(0)
-np.random.seed(0)
+#random.seed(0)
+#np.random.seed(0)
 
-def experiment_regpath_(dataset, synth_params, size, scale_data, redundant, noise, lmbda_grid, mu, loss, penalty, 
-                        intercept, n_ellipsoid_steps, n_epochs, n_epochs_ell_path, cut, get_ell_from_subset, clip_ell, 
+def experiment_regpath(dataset, synth_params, size, scale_data, redundant, noise, lmbda_grid_start, lmbda_grid_end, lmbda_grid_num,
+                        mu, loss, penalty, intercept, n_ellipsoid_steps, n_epochs, n_epochs_ell_path, cut, get_ell_from_subset, clip_ell, 
                         use_sphere, nb_exp, dontsave):
     
     print('START')
 
-    exp_title = 'X_size_{}_ell_subset_{}_loss_{}_intercept_{}_n_ell_{}_mu_{}_redundant_{}_noise_{}_cut_ell_{}_clip_ell_{}_n_epochs_{}_n_ell_path_{}_use_sphere_{}_regpath_'.format(size, 
-        get_ell_from_subset, loss, intercept, n_ellipsoid_steps, mu, redundant, noise, cut, clip_ell, n_epochs, n_epochs_ell_path, use_sphere)
+    exp_title = 'X_size_{}_ell_subset_{}_loss_{}_n_ell_{}_mu_{}_cut_ell_{}_n_epochs_{}_n_ell_path_{}_use_sphere_{}_start_{}_end_{}_num_{}_regpath'.format(size, 
+        get_ell_from_subset, loss, n_ellipsoid_steps, mu, cut, n_epochs, n_epochs_ell_path, use_sphere, lmbda_grid_start, lmbda_grid_end, lmbda_grid_num)
     print(exp_title)
 
     X, y = load_experiment(dataset, synth_params, size, redundant, noise, classification=True)
 
     data = {}
 
-    lmbda_grid = np.logspace(lmbda_grid[0], lmbda_grid[1], num=lmbda_grid[2])
+    lmbda_grid = np.logspace(lmbda_grid_start, lmbda_grid_end, num=lmbda_grid_num)
     for lmbda in lmbda_grid:
         data['budget_ell_lmbda_{}'.format(lmbda)] = 0
         data['budget_noscreen_lmbda_{}'.format(lmbda)] = 0
@@ -58,7 +58,7 @@ def experiment_regpath_(dataset, synth_params, size, scale_data, redundant, nois
         random.seed(compt_exp + 1)
         np.random.seed(compt_exp + 1)
         compt_exp += 1
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+        X_train, _, y_train, _ = train_test_split(X, y, test_size=0.2)
         
         for lmbda in lmbda_grid:
             print('---------- LMBDA ---------: ', lmbda)
@@ -82,51 +82,53 @@ def experiment_regpath_(dataset, synth_params, size, scale_data, redundant, nois
 
                 svc_ell = BinaryClassifier(loss='sqhinge', penalty=penalty, fit_intercept=intercept)
                 svc_ell.fit(X_train, y_train, solver='qning-svrg', lambd=lmbda, verbose=False)
-                z_svc_ell = svc_ell.w
-
+    
             else:
-                print('Score svc ell prev : ', svc_ell.score(X_test, y_test),
-                     'Score svc prev : ', svc.score(X_test, y_test),
-                     'Score screener prev : ', screener_ell.score(X_test, y_test))
 
                 budget_fit_solver_noscreen = svc.fit(X_train, y_train, solver='qning-svrg', it0=1, lambd=lmbda, restart=True, verbose=False)[0,-1]
                 print('Epoch fit solver no screen :', budget_fit_solver_noscreen)
                 budget_noscreen += budget_fit_solver_noscreen * X_train.shape[0]
                 print('Budget solver no screen :', budget_noscreen)
 
+                info = svc_ell.fit(X_train, y_train, solver='qning-svrg', lambd=lmbda, 
+                            verbose=False, nepochs=n_epochs_ell_path, it0=1, restart=True)
+                dg = info[1,-1] - info[2, -1]
+
                 screener_ell = EllipsoidScreener(lmbda=lmbda, mu=mu, loss=loss, penalty=penalty, 
                                                 intercept=intercept, classification=True, 
                                                 n_ellipsoid_steps=n_ellipsoid_steps, 
                                                 cut=cut, clip_ell=clip_ell, use_sphere=use_sphere, 
                                                 ars=True)
-                screener_dg = DualityGapScreener(lmbda=lmbda, n_epochs=n_epochs_ell_path, ars=True)
-                
+                #screener_dg = DualityGapScreener(lmbda=lmbda, n_epochs=0, ars=True)
                 random_subset = random.sample(range(0, X_train.shape[0]), get_ell_from_subset)
-                screener_dg.fit(X_train, y_train, init=z_svc_ell)
-                print('Init rad : ', 2 * screener_dg.dg / lmbda)
-                budget_init_ell = (n_epochs_ell_path) * X_train.shape[0]
+                print('Init rad : ', 2 * dg / lmbda)
                 screener_ell.fit(X_train[random_subset], y_train[random_subset], 
-                                init=screener_dg.z, rad=2 * screener_dg.dg / lmbda)
+                                init=svc_ell.w, rad=2 * dg / lmbda)
+                #screener_dg.fit(X_train, y_train, init=svc_ell.w)
                 if use_sphere and n_ellipsoid_steps > 0:
                     print('Final rad : ', screener_ell.squared_radius)
-                budget_fit_ell = n_ellipsoid_steps * get_ell_from_subset
+
                 scores_ell = screener_ell.screen(X_train, y_train)
-                budget_screen = X_train.shape[0]
                 tokeep = np.where(scores_ell > - mu)[0]
-                print(X_train[tokeep].shape)
-                #tokeep = random.sample(range(0, X_train.shape[0]), len(tokeep)) #this is a test
+                print('To keep : ', len(tokeep))
+                
+                budget_fit_solver = svc_ell.fit(X_train[tokeep], y_train[tokeep], solver='qning-svrg', it0=1, 
+                                                lambd=lmbda * (X_train.shape[0] / len(tokeep)), restart=True, verbose=False)[0, -1]
+                
+                budget_init_ell = (n_epochs_ell_path) * X_train.shape[0]
+                budget_fit_ell = n_ellipsoid_steps * get_ell_from_subset
+                if cut:
+                    budget_fit_ell += get_ell_from_subset
+                budget_ell += budget_init_ell + budget_fit_ell + budget_fit_solver * len(tokeep)
 
-                #svc_ell.w = screener_ell.z
-                budget_fit_solver = svc_ell.fit(X_train[tokeep], y_train[tokeep], solver='qning-svrg', it0=1, lambd=lmbda, restart=True, verbose=False)[0, -1]
                 print('Epoch fit solver screen', budget_fit_solver)
-                z_svc_ell = svc_ell.w
-                print('Budget solver screen : ', budget_init_ell, budget_fit_ell, budget_screen, budget_fit_solver * len(tokeep))
-                budget_ell += budget_init_ell + budget_fit_ell + budget_screen + budget_fit_solver * len(tokeep)
+                print('Budget solver screen : ', budget_init_ell, budget_fit_ell, budget_fit_solver * len(tokeep))
 
-    
     
             score_ell = svc_ell.score(X_train, y_train)
             score_noscreen = svc.score(X_train, y_train)
+
+            print('Score on screened : ', score_ell, 'Score on whole : ', score_noscreen)
 
             data['budget_ell_lmbda_{}'.format(lmbda)] += budget_ell
             data['budget_noscreen_lmbda_{}'.format(lmbda)] += budget_noscreen      
@@ -154,16 +156,18 @@ if __name__ == '__main__':
     parser.add_argument('--scale_data', action='store_true')
     parser.add_argument('--redundant', default=0, type=int, help='add redundant examples to the dataset. Do not use redundant with --size')
     parser.add_argument('--noise', default=0.1, type=float, help='standard deviation of the noise to add to the redundant examples')
-    parser.add_argument('--lmbda_grid', default=[-4, -5, 20], nargs='+', type=float, help='regularization parameter grid of the estimator')
+    parser.add_argument('--lmbda_grid_start', default=-4, type=float, help='regularization parameter grid of the estimator')
+    parser.add_argument('--lmbda_grid_end', default=-5, type=float, help='regularization parameter grid of the estimator')
+    parser.add_argument('--lmbda_grid_num', default=20, type=int, help='regularization parameter grid of the estimator')
     parser.add_argument('--mu', default=1.0, type=float, help='regularization parameter of the dual')
     parser.add_argument('--loss', default='squared_hinge', choices=['hinge', 'squared_hinge', 'squared','truncated_squared', 'safe_logistic', 'logistic'])
     parser.add_argument('--penalty', default='l2', choices=['l1','l2'])
     parser.add_argument('--intercept', action='store_true')
-    parser.add_argument('--n_ellipsoid_steps', default=0, type=int, help='number of ellipsoid step in screen ell')
-    parser.add_argument('--n_epochs', default=15, type=int, help='number of epochs of the solver in ellipsoid method for screening')
-    parser.add_argument('--n_epochs_ell_path', default=2, type=int, help='number of epochs of the solver in ellipsoid method for screening in path')
+    parser.add_argument('--n_ellipsoid_steps', default=500, type=int, help='number of ellipsoid step in screen ell')
+    parser.add_argument('--n_epochs', default=21, type=int, help='number of epochs of the solver in ellipsoid method for screening')
+    parser.add_argument('--n_epochs_ell_path', default=0, type=int, help='number of epochs of the solver in ellipsoid method for screening in path')
     parser.add_argument('--cut_ell', action='store_true', help='cut the final ellipsoid in half using a subgradient of the loss')
-    parser.add_argument('--get_ell_from_subset', default=48000, type=int, help='train the ellipsoid on a random subset of the dataset')
+    parser.add_argument('--get_ell_from_subset', default=50, type=int, help='train the ellipsoid on a random subset of the dataset')
     parser.add_argument('--clip_ell', action='store_true', help='clip the eigenvalues of the ellipsoid')
     parser.add_argument('--use_sphere', action='store_true', help='the region is a sphere whose radius is the smallest semi-axe of the ellipsoid')
     parser.add_argument('--nb_exp', default=2, type=int)
@@ -171,7 +175,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
 
-    experiment_regpath_(args.dataset, args.synth_params, args.size, args.scale_data, args.redundant, args.noise, 
-                args.lmbda_grid, args.mu, args.loss, args.penalty, args.intercept, args.n_ellipsoid_steps, 
+    experiment_regpath(args.dataset, args.synth_params, args.size, args.scale_data, args.redundant, args.noise, 
+                args.lmbda_grid_start, args.lmbda_grid_end, args.lmbda_grid_num, args.mu, args.loss, args.penalty, args.intercept, args.n_ellipsoid_steps, 
                 args.n_epochs, args.n_epochs_ell_path, args.cut_ell, args.get_ell_from_subset, args.clip_ell, 
                 args.use_sphere, args.nb_exp, args.dontsave)

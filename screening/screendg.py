@@ -62,7 +62,7 @@ class DualityGapScreener:
             else:
                 restart = False
             #self.first_obj, self.first_dg =  self.get_duality_gap(svc)
-            info = svc.fit(X_train, y_train, lambd=self.lmbda, solver='acc-svrg', 
+            info = svc.fit(X_train, y_train, lambd=self.lmbda, solver='qning-svrg', 
                         nepochs=self.n_epochs, it0=1, tol=1.0e-20, restart=restart, verbose=False)
             self.loss = info[1,-1]
             self.dg = self.loss - info[2, -1]
@@ -98,7 +98,7 @@ if __name__ == "__main__":
     from screening.loaders import load_experiment
     import random
 
-    X, y = load_experiment(dataset='mnist', synth_params=None, size=1000, redundant=0, 
+    X, y = load_experiment(dataset='mnist', synth_params=None, size=60000, redundant=0, 
                             noise=None, classification=True)
     #random.seed(0)
     #np.random.seed(0)
@@ -111,16 +111,21 @@ if __name__ == "__main__":
 
     #epoch=10
     
-    #screener = DualityGapScreener(lmbda=0.001, n_epochs=epoch, ars=True).fit(X_train, y_train)
-    #print('DUALITY GAP LAMBDA 0.001 ; ', screener.dg)
-    #print('SCORE', screener.score(X_test, y_test))
-    #print('COEF', screener.z)
+    screener = DualityGapScreener(lmbda=1e-5, n_epochs=9, ars=True).fit(X_train, y_train)
+    print('Squared Radius : ', 2 * screener.dg / 1e-5)
+    print('Score : ', screener.score(X_test, y_test))
+    
 
-    compt = 0
-    while compt < 20:
-        svc_ell = BinaryClassifier(loss='sqhinge', penalty='l2')
-        budget_fit_solver = svc_ell.fit(X_train, y_train, solver='qning-svrg', it0=1, lambd=9e-5, verbose=False)[0,-1] #* X_train.shape[0] #len(tokeep_ell)
-        print(budget_fit_solver)
-        compt += 1
+    svc_ell = BinaryClassifier(loss='sqhinge', penalty='l2')
+    budget_fit_solver = svc_ell.fit(X_train, y_train, solver='qning-svrg', it0=1, lambd=1e-5, verbose=False)[0,-1] #* X_train.shape[0] #len(tokeep_ell)
+    print(budget_fit_solver, budget_fit_solver * X_train.shape[0])
+
+    scores = screener.screen(X_train, y_train)
+    tokeep = np.where(scores > - 1.0)[0]
+    print('Nb kept : ', len(tokeep))
+    svc_ell = BinaryClassifier(loss='sqhinge', penalty='l2')
+    budget_fit_solver = svc_ell.fit(X_train[tokeep], y_train[tokeep], solver='qning-svrg', it0=1, lambd=1e-5, verbose=False)[0,-1] #* X_train.shape[0] #len(tokeep_ell)
+    print(budget_fit_solver, len(tokeep), budget_fit_solver * len(tokeep))
+
 
     

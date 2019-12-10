@@ -21,7 +21,7 @@ class SafeLogistic:
 
     def fit(self, D, y):
         safelog = BinaryClassifier(loss='safe-logistic', penalty='l1')
-        safelog.fit(D, y, lambd=self.lmbda, solver='qning-miso', nepochs=self.max_iter, 
+        safelog.fit(D, y, lambd=self.lmbda, solver='qning-miso', max_epochs=self.max_iter, 
                     verbose=False)
         self.coef_ = np.array([safelog.w])
         return self

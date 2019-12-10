@@ -63,6 +63,21 @@ def load_rcv1():
     print(' ... Done !')
     return X.astype('float64'), y
 
+def load_cifar10_kernel():
+    print('Loading CIFAR-10 kernel...')
+    X = np.load(os.path.join(DATASETS_PATH,'ktrain.npy'))
+    X = X[:1000,:1000]
+    y = np.load(os.path.join(DATASETS_PATH,'cifar_white_ytrain.npy'))
+    y = y[:1000]
+    y = np.array(y, dtype=int).reshape(y.shape[0])
+    for i in range(len(y)):
+        if y[i] != 9:
+            y[i] = - 1
+        else:
+            y[i] = 1
+    print(' ... Done !')
+    return X, y
+
 def load_higgs():
     dir_higgs = DATASETS_PATH + 'higgs'
     with open(dir_higgs, 'rb') as handle:
@@ -97,6 +112,8 @@ def load_experiment(dataset, synth_params, size, redundant, noise, classificatio
         X, y = load_svhn()
     elif dataset == 'rcv1':
         X, y = load_rcv1()
+    elif dataset == 'cifar10_kernel':
+        X, y = load_cifar10_kernel()
     elif dataset == 'synthetic':
         X, y, _, _ = make_data(synth_params[0], synth_params[1], synth_params[2]) #old params: 100, 2, 0.5
         #print('TRUE SYNTHETIC PARAMETERS', true_params)
@@ -116,6 +133,6 @@ def load_experiment(dataset, synth_params, size, redundant, noise, classificatio
     return X, y
 
 if __name__ == "__main__":
-    X, y = load_experiment(dataset='rcv1', synth_params=None, size=1000000, redundant=0, noise=None, classification=True)
-    print(X[0], X.shape, y.shape)
-    print(np.unique(y, return_counts=True))
+    X, y = load_experiment(dataset='cifar10_kernel', synth_params=None, size=1000000, redundant=0, noise=None, classification=True)
+    print(X[0], X.shape)
+    print(y.shape, np.unique(y, return_counts=True))

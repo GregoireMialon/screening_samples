@@ -27,3 +27,25 @@ def fit_estimator(X, y, loss, penalty, mu, lmbda, intercept, max_iter=10000, ars
     else:
     	print('ERROR, you picked a combination which is not implemented.')
     return estimator
+
+if __name__ == "__main__":
+    #Test the estimators
+    import numpy as np
+    from sklearn.model_selection import train_test_split
+    from screening.loaders import load_experiment
+    import random
+
+    X, y = load_experiment(dataset='cifar10_kernel', synth_params=None, size=1000, redundant=0, 
+                            noise=None, classification=True)
+    #random.seed(0)
+    #np.random.seed(0)
+
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+
+    prop = np.unique(y_test, return_counts=True)[1]
+    print('BASELINE : ', 1 - prop[1] / prop[0])
+
+    estimator = fit_estimator(X_train, y_train, loss='safe_logistic', penalty='l2', mu=0, lmbda=0, 
+                                intercept=False)
+    print(estimator.score(X_test, y_test))
+    print(estimator.predict(X_test))

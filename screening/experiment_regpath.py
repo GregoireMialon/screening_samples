@@ -29,8 +29,8 @@ import time
 
 #@profile
 
-#random.seed(0)
-#np.random.seed(0)
+random.seed(0)
+np.random.seed(0)
 
 def experiment_regpath(dataset, synth_params, size, scale_data, redundant, noise, lmbda_grid_start, lmbda_grid_end, lmbda_grid_num,
                         mu, loss, penalty, intercept, n_ellipsoid_steps, n_epochs, n_epochs_ell_path, cut, get_ell_from_subset, clip_ell, 
@@ -65,7 +65,7 @@ def experiment_regpath(dataset, synth_params, size, scale_data, redundant, noise
             budget_ell = 0
             budget_noscreen = 0
             if lmbda == lmbda_grid[0]:
-                screener_ell = EllipsoidScreener(lmbda=lmbda, mu=mu, loss=loss, penalty=penalty, 
+                screener_ell = EllipsoidScreener(lmbda=lmbda * X_train.shape[0] / get_ell_from_subset, mu=mu, loss=loss, penalty=penalty, 
                                                 intercept=intercept, classification=True, 
                                                 n_ellipsoid_steps=n_ellipsoid_steps, 
                                                 cut=cut, clip_ell=clip_ell, use_sphere=use_sphere, 
@@ -75,7 +75,7 @@ def experiment_regpath(dataset, synth_params, size, scale_data, redundant, noise
                 print('Init radius : ', screener_dg.squared_radius)
                 random_subset = random.sample(range(0, X_train.shape[0]), get_ell_from_subset)
                 screener_ell.fit(X_train[random_subset], y_train[random_subset], 
-                                init=screener_dg.z, rad=screener_dg.squared_radius)
+                                init=screener_dg.z, rad=screener_dg.squared_radius) #rescaler lmbda quand on subsample ?
                 
                 svc = BinaryClassifier(loss='sqhinge', penalty=penalty, fit_intercept=intercept)
                 svc.fit(X_train, y_train, solver='qning-svrg', lambd=lmbda, verbose=False)
@@ -94,17 +94,15 @@ def experiment_regpath(dataset, synth_params, size, scale_data, redundant, noise
                             verbose=False, nepochs=n_epochs_ell_path, it0=1, restart=True)
                 dg = info[1,-1] - info[2, -1]
 
-                screener_ell = EllipsoidScreener(lmbda=lmbda, mu=mu, loss=loss, penalty=penalty, 
+                screener_ell = EllipsoidScreener(lmbda=lmbda * X_train.shape[0] / get_ell_from_subset, mu=mu, loss=loss, penalty=penalty, 
                                                 intercept=intercept, classification=True, 
                                                 n_ellipsoid_steps=n_ellipsoid_steps, 
                                                 cut=cut, clip_ell=clip_ell, use_sphere=use_sphere, 
                                                 ars=True)
-                #screener_dg = DualityGapScreener(lmbda=lmbda, n_epochs=0, ars=True)
                 random_subset = random.sample(range(0, X_train.shape[0]), get_ell_from_subset)
                 print('Init rad : ', 2 * dg / lmbda)
                 screener_ell.fit(X_train[random_subset], y_train[random_subset], 
                                 init=svc_ell.w, rad=2 * dg / lmbda)
-                #screener_dg.fit(X_train, y_train, init=svc_ell.w)
                 if use_sphere and n_ellipsoid_steps > 0:
                     print('Final rad : ', screener_ell.squared_radius)
 

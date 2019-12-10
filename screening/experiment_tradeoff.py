@@ -27,7 +27,7 @@ import os
 
 #@profile
 def experiment_tradeoff(dataset, synth_params, size, scale_data, redundant, noise, lmbda, mu, 
-                loss, penalty, intercept, acc, n_ellipsoid_steps, better_init, cut, get_ell_from_subset, clip_ell, 
+                loss, penalty, intercept, acc, rescale, n_ellipsoid_steps, better_init, cut, get_ell_from_subset, clip_ell, 
                 use_sphere, guarantee, nb_exp, plot, zoom, dontsave):
     
     print('START')
@@ -36,6 +36,10 @@ def experiment_tradeoff(dataset, synth_params, size, scale_data, redundant, nois
 
     if acc:
         exp_title = 'X_size_{}_ell_subset_{}_loss_{}_lmbda_{}_n_ellipsoid_{}_mu_{}_better_init_{}_cut_ell_{}_clip_ell_{}_use_sphere_{}_acc'.format(size, 
+            get_ell_from_subset, loss, lmbda, n_ellipsoid_steps, mu, better_init, 
+            cut, clip_ell, use_sphere)
+    elif rescale:
+        exp_title = 'X_size_{}_ell_subset_{}_loss_{}_lmbda_{}_n_ellipsoid_{}_mu_{}_better_init_{}_cut_ell_{}_clip_ell_{}_use_sphere_{}_tradeoff_rescale'.format(size, 
             get_ell_from_subset, loss, lmbda, n_ellipsoid_steps, mu, better_init, 
             cut, clip_ell, use_sphere)
     else:
@@ -74,8 +78,12 @@ def experiment_tradeoff(dataset, synth_params, size, scale_data, redundant, nois
                     scores_screening_all[i - 1] += get_nb_safe(scores, mu, classification=True)
                     print('SCREEN DG RADIUS', screener_dg.squared_radius)
                 elif better_init < i <= nb_epochs:
+                    if rescale:
+                        lmbda_ = lmbda * X_train.shape[0] / get_ell_from_subset
+                    else:
+                        lmbda_ = lmbda
                     random_subset = random.sample(range(0, X_train.shape[0]), get_ell_from_subset)
-                    screener_ell = EllipsoidScreener(lmbda=lmbda, mu=mu, loss=loss, penalty=penalty, 
+                    screener_ell = EllipsoidScreener(lmbda=lmbda_, mu=mu, loss=loss, penalty=penalty, 
                                             intercept=intercept, classification=True, 
                                             n_ellipsoid_steps= int((i - better_init) * X_train.shape[0] / get_ell_from_subset), 
                                             better_init=0, better_radius=0, 
@@ -93,8 +101,10 @@ def experiment_tradeoff(dataset, synth_params, size, scale_data, redundant, nois
                 print('NB TO KEEP', len(idx_safeell))
                 if len(idx_safeell) !=0:
                     estimator_whole = fit_estimator(X_train, y_train, loss, penalty, mu, lmbda, intercept)
+                    if rescale:
+                        lmbda_ = lmbda * X_train.shape[0] / len(idx_safeell)
                     estimator_screened = fit_estimator(X_train[idx_safeell], y_train[idx_safeell], loss, 
-                                    penalty, mu, lmbda, intercept)
+                                    penalty, mu, lmbda_, intercept)
                     temp = np.array([estimator_whole.score(X_train, y_train), 
                                 estimator_screened.score(X_train, y_train)])
                     print('SAFE GUARANTEE : ', temp)
@@ -135,6 +145,7 @@ if __name__ == '__main__':
     parser.add_argument('--penalty', default='l2', choices=['l1','l2'])
     parser.add_argument('--intercept', action='store_true')
     parser.add_argument('--acc', action='store_true', help='for plot accuracy of estimator vs epoch')
+    parser.add_argument('--rescale', action='store_true', help='rescale lmbda when subsampling')
     parser.add_argument('--n_ellipsoid_steps', default=10, type=int, help='number of ellipsoid steps to be done')
     parser.add_argument('--better_init', default=2, type=int, help='number of optimizer gradient steps to initialize the center of the ellipsoid')
     parser.add_argument('--cut_ell', action='store_true', help='cut the final ellipsoid in half using a subgradient of the loss')
@@ -150,7 +161,7 @@ if __name__ == '__main__':
 
 
     experiment_tradeoff(args.dataset, args.synth_params, args.size, args.scale_data, args.redundant, args.noise, 
-                args.lmbda, args.mu, args.loss, args.penalty, args.intercept, args.acc,
+                args.lmbda, args.mu, args.loss, args.penalty, args.intercept, args.acc, args.rescale,
                 args.n_ellipsoid_steps, args.better_init, args.cut_ell, 
                 args.get_ell_from_subset, args.clip_ell, args.use_sphere, args.guarantee, 
                 args.nb_exp, args.plot, args.zoom, args.dontsave)

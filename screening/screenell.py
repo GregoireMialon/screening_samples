@@ -290,6 +290,3 @@ if __name__ == "__main__":
         temp = np.array([estimator_whole.score(X_train, y_train), 
                     estimator_screened.score(X_train, y_train)])
         print('SAFE GUARANTEE : ', temp)
-
-
-    print('GUARANTEE : ', )

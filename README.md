@@ -56,19 +56,23 @@ if len(idx_safeell) !=0:
 
 Run 
 
-`export PYTHONPATH=$PWD:$PYTHONPATH`
+```bash
+export PYTHONPATH=$PWD:$PYTHONPATH
+```
 
 and then 
 
-`python experiment.py`
+```bash
+python experiment.py
+```
 
 Possible arguments are detailed in `experiment.py`.
 
 #### Interval Regression : Install plasp
 
-`git clone https://github.com/VivienCabannes/plasp`
-
-`cd plasp`
-
-`pip install -e .`
+```bash
+git clone https://github.com/VivienCabannes/plasp
+cd plasp
+pip install -e .
+```
 

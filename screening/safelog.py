@@ -1,6 +1,6 @@
 import numpy as np
 from sklearn.model_selection import train_test_split
-from screening.loaders import load_experiment
+from utils.loaders import load_experiment
 from screening.screentools import (
     compute_loss,
     compute_subgradient

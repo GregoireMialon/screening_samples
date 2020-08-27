@@ -6,7 +6,7 @@ This is the code associated to the AISTATS 2020 paper [Screening Data Points in 
 
 The API is similar to scikit-learn.
 
-```
+```python
 from sklearn.model_selection import train_test_split
 from utils.loaders import load_experiment
 

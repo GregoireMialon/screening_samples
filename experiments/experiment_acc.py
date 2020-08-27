@@ -47,5 +47,3 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     experiment_acc(args.dataset, args.loss, args.penalty, args.lmbda)
-
-    #for lmbda in [0.0001, 0.001, 0.01, 0.1, 1.0]:

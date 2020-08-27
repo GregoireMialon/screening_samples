@@ -5,7 +5,7 @@ from screening.screentools import (
     compute_loss,
     compute_subgradient
 )
-from arsenic import BinaryClassifier
+from cyanure import BinaryClassifier
 import random
     
 
@@ -38,7 +38,7 @@ class SafeLogistic:
 
     
 if __name__ == "__main__":
-    #unit test
+    #simple test
     print('START')
     X, y = load_experiment(dataset='rcv1', synth_params=None, size=100000, redundant=0, 
                             noise=None, classification=True)

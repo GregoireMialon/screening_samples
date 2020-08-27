@@ -6,9 +6,10 @@ from screening.screentools import (
     compute_squared_hinge_gradient,
     compute_squared_hinge_conjugate
 )
-from arsenic import BinaryClassifier
+from cyanure import BinaryClassifier
 import numpy as np
 import time
+
 
 class DualityGapScreener:
     '''
@@ -63,7 +64,7 @@ class DualityGapScreener:
                 restart = False
             #self.first_obj, self.first_dg =  self.get_duality_gap(svc)
             info = svc.fit(X_train, y_train, lambd=self.lmbda, solver='qning-svrg', 
-                        nepochs=self.n_epochs, it0=1, tol=1.0e-20, restart=restart, verbose=False)
+                        max_epochs=self.n_epochs, it0=1, tol=1.0e-20, restart=restart, verbose=False)
             self.loss = info[1,-1]
             self.dg = self.loss - info[2, -1]
             self.z = svc.w.reshape(-1,)
@@ -93,24 +94,19 @@ class DualityGapScreener:
     
 
 if __name__ == "__main__":
-    #we check that it works with MNIST
+    # simple test
     from sklearn.model_selection import train_test_split
-    from screening.loaders import load_experiment
+    from utils.loaders import load_experiment
     import random
 
     X, y = load_experiment(dataset='mnist', synth_params=None, size=60000, redundant=0, 
                             noise=None, classification=True)
-    #random.seed(0)
-    #np.random.seed(0)
-
-
+ 
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
 
     prop = np.unique(y_test, return_counts=True)[1]
     print('BASELINE : ', 1 - prop[1] / prop[0])
 
-    #epoch=10
-    
     screener = DualityGapScreener(lmbda=1e-5, n_epochs=9, ars=True).fit(X_train, y_train)
     print('Squared Radius : ', 2 * screener.dg / 1e-5)
     print('Score : ', screener.score(X_test, y_test))

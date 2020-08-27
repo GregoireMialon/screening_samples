@@ -22,7 +22,7 @@ from sklearn.linear_model import Lasso, LogisticRegression
 from sklearn.utils import shuffle
 from sklearn.preprocessing import StandardScaler
 from utils.settings import RESULTS_PATH
-from arsenic import BinaryClassifier
+from cyanure import BinaryClassifier
 import random
 import os
 import time
@@ -75,7 +75,7 @@ def experiment_regpath(dataset, synth_params, size, scale_data, redundant, noise
                 print('Init radius : ', screener_dg.squared_radius)
                 random_subset = random.sample(range(0, X_train.shape[0]), get_ell_from_subset)
                 screener_ell.fit(X_train[random_subset], y_train[random_subset], 
-                                init=screener_dg.z, rad=screener_dg.squared_radius) #rescaler lmbda quand on subsample ?
+                                init=screener_dg.z, rad=screener_dg.squared_radius)
                 
                 svc = BinaryClassifier(loss='sqhinge', penalty=penalty, fit_intercept=intercept)
                 svc.fit(X_train, y_train, solver='qning-svrg', lambd=lmbda, verbose=False)
@@ -91,7 +91,7 @@ def experiment_regpath(dataset, synth_params, size, scale_data, redundant, noise
                 print('Budget solver no screen :', budget_noscreen)
 
                 info = svc_ell.fit(X_train, y_train, solver='qning-svrg', lambd=lmbda, 
-                            verbose=False, nepochs=n_epochs_ell_path, it0=1, restart=True)
+                            verbose=False, max_epochs=n_epochs_ell_path, it0=1, restart=True)
                 dg = info[1,-1] - info[2, -1]
 
                 screener_ell = EllipsoidScreener(lmbda=lmbda * X_train.shape[0] / get_ell_from_subset, mu=mu, loss=loss, penalty=penalty, 

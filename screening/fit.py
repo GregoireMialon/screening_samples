@@ -1,7 +1,7 @@
 from screening.safelog import SafeLogistic
 from sklearn.svm import LinearSVC
 from sklearn.linear_model import Lasso, LogisticRegression
-from arsenic import BinaryClassifier
+from cyanure import BinaryClassifier
 
 
 def fit_estimator(X, y, loss, penalty, mu, lmbda, intercept, max_iter=10000, ars=False):
@@ -32,7 +32,7 @@ if __name__ == "__main__":
     #Test the estimators
     import numpy as np
     from sklearn.model_selection import train_test_split
-    from screening.loaders import load_experiment
+    from utils.loaders import load_experiment
     import random
 
     X, y = load_experiment(dataset='cifar10_kernel', synth_params=None, size=1000, redundant=0, 

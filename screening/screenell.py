@@ -254,9 +254,9 @@ class EllipsoidScreener:
         return self.scores
 
 if __name__ == "__main__":
-    #we check that it works with MNIST
+    # simple test
     from sklearn.model_selection import train_test_split
-    from screening.loaders import load_experiment
+    from utils.loaders import load_experiment
     
     X, y = load_experiment(dataset='cifar10_kernel', synth_params=None, size=10000, redundant=0, 
                             noise=None, classification=True)

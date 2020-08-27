@@ -1,3 +1,3 @@
-DATASETS_PATH='/sequoia/data1/gmialon/datasets/'
-RESULTS_PATH='/sequoia/data1/gmialon/results/'
-LOGS_PATH='/sequoia/data1/gmialon'
+DATASETS_PATH='../datasets/'
+RESULTS_PATH='../results/'
+LOGS_PATH='../logs/'
